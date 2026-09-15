@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy-50: #f0f3f9;
+  --color-navy-100: #d9e0ef;
+  --color-navy-200: #b3c1df;
+  --color-navy-300: #8da2cf;
+  --color-navy-400: #6783bf;
+  --color-navy-500: #4164af;
+  --color-navy-600: #34508c;
+  --color-navy-700: #273c69;
+  --color-navy-800: #1a2846;
+  --color-navy-900: #0d1423;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
