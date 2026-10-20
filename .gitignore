@@ -43,3 +43,12 @@ backend/publish_test.py
 .env
 .env.local
 .env.*.local
+
+# Simulation outputs (regenerate with simulation/runall.sh and runsens.sh)
+simulation/results/result_*.json
+simulation/results_sens/
+simulation/*.rou.xml
+simulation/*.trips.xml
+simulation/stops.add.xml
+simulation/log_*.txt
+.pytest_cache/

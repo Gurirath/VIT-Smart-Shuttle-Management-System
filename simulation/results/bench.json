@@ -1,0 +1,24 @@
+{
+ "python": "3.13.16",
+ "machine": "x86_64",
+ "processor": "x86_64",
+ "iterations": 50000,
+ "us_per_call": {
+  "Seat classification (pressure + temperature band)": 0.12935502000004817,
+  "Debounce update (one seat)": 0.06067464000011568,
+  "NMEA RMC parse + checksum": 3.198732259999133,
+  "Haversine distance": 0.4305980800006637,
+  "Stationary check (two fixes)": 0.43131130000006124,
+  "Boarding-gate AND check": 0.03969713999936175,
+  "Rider verification (public ticket)": 0.8041568800001642,
+  "Fare: distance slab": 0.1807577800002491,
+  "Fare: stage table": 0.21520907999956762,
+  "Fare: per-km": 0.4254137600003105,
+  "Universal fare record": 0.9643009199999142,
+  "Seat summary build + JSON encode (44 seats)": 7.082737939999788,
+  "Stop board build (6 candidates, 4 rows)": 2.3561005999999907,
+  "ETA estimate": 0.11534862000075918,
+  "Escalation assessment (T1-T3)": 0.3498433799995837,
+  "FULL per-event cycle": 5.308998699999847
+ }
+}

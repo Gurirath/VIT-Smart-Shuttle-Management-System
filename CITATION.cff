@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Multi-tier edge-cloud sensor network for public and institutional bus fleets: code, prototype and simulation"
+authors:
+  - family-names: Khurana
+    given-names: Gurirath Singh
+    affiliation: "Vellore Institute of Technology, Vellore, India"
+    email: gurirathkhurana@gmail.com
+version: 1.0.0
+date-released: 2026-10-20
+license: MIT
+repository-code: "https://github.com/Gurirath/VIT-Smart-Shuttle-Management-System"
+keywords:
+  - transit IoT
+  - seat availability
+  - passenger information
+  - ESP32
+  - edge-cloud
+  - SUMO

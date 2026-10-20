@@ -1,222 +1,129 @@
-﻿# VIT Smart Shuttle Management System
+﻿# Multi-tier edge-cloud sensor network for public and institutional bus fleets
 
-> **IoT-enabled smart campus shuttle system** — real-time seat occupancy classification, GPS tracking, biometric boarding verification, automated distance-based billing, WiFi/GSM network fallback, and demand-poll-driven dispatch.  
-> Built for **VIT Vellore** as part of an embedded IoT + full-stack engineering project.
+Code, prototype and simulation behind the paper "A Multi-Tier Edge-Cloud Sensor Network for Real-Time Seat Availability, Occupancy Verification, Dynamic Fare Computation and Risk Escalation in Public and Institutional Bus Fleets" (Gurirath Singh Khurana, Vellore Institute of Technology).
 
----
+The system started as the VIT campus shuttle prototype and was generalised to public buses. A force-sensing resistor and a DS18B20 probe under each seat feed an ESP32 that classifies the seat as EMPTY, OBJECT or OCCUPIED. The bus sends a seat summary every 10 s over MQTT (GSM SMS when 4G or Wi-Fi drops), and a control centre combines it with recent segment travel times to show the next buses, their arrival times and their free seats on a television screen at every stop. The same network checks boarding against tickets, computes fares (slab, stage, per-km or flat) and escalates anomalies in three tiers (T1 to T3).
 
-## Project Description
+![Architecture](docs/diagrams/IoT_Complete_Multi-Tier_Architecture.png)
 
-The VIT Smart Shuttle System replaces manual shuttle coordination with an integrated IoT pipeline. An ESP32 microcontroller on each shuttle collects data from:
+## What is in this repository
 
-- **Pressure + temperature sensors** (FSR + DS18B20) mounted under each seat to classify occupancy as `AVAILABLE`, `OCCUPIED`, or `BAG_DETECTED`
-- **GPS module** (simulated via potentiometer in Wokwi) for real-time route tracking and stop-based progress
-- **Biometric face-scan button** for passenger entry verification
-- **WiFi/GSM toggle** for network fallback simulation
+| Folder | Contents | Paper sections |
+|---|---|---|
+| `firmware/` | ESP32 sketch for Wokwi (`vit_shuttle_sketch.ino`), circuit (`diagram.json`), library list | 3.2 to 3.6, 4.1 |
+| `backend/` | FastAPI + SQLite back end with the MQTT subscriber (Domain C of the prototype) | 3.6.3, 3.12, 3.18 |
+| `src/` | React + TypeScript operator dashboard (7 pages) | 3.12, 3.18 |
+| `python-gui/` | Tkinter test program and `shuttle_core.py` used for the functional tests and timing benchmarks | 4.4, 4.5, 4.7 |
+| `reference/` | `transit_core.py`, the reference module for the generalised design (classifier with environment setting, NMEA parsing, gate logic, identity profiles, fare engine, ETA, stop boards, T1 to T3 escalation), and 44 unit tests | 3.15, 4.2, 4.8 |
+| `simulation/` | SUMO corridor simulation (12 km, 20 stops), analysis, benchmarks, city-scale load test, sensitivity runs and statistics | 3.20, 4.9, 4.10, 6.2, 6.3 |
+| `simulation/results/` | `metrics.json`, `bench.json`, `loadtest.json`, `stats.json` and per-run summaries that every number in Sections 4 and 6 comes from | 4, 6 |
+| `figures/` | Every figure in the paper | Figs. 1 to 17 |
+| `docs/` | Architecture diagrams and dashboard screenshots | |
 
-Sensor events are published over **MQTT (HiveMQ)** to a **FastAPI + SQLite** backend, which classifies seats, updates passenger counts, records trips, and calculates GPS-distance-based fares (`max(₹2, distance_km × ₹5)`). A **React + TypeScript** management dashboard consumes the REST API and displays all data in real time. A **Python Tkinter GUI** cross-validates sensor readings independently.
+## Figures in the paper
 
----
+| Fig. | File | Made by |
+|---|---|---|
+| 1 | `fig_orig_architecture.png` | Architecture diagram (edited) |
+| 2 | `fig_orig_pipeline.png` | Processing pipeline diagram (edited) |
+| 3 | `fig_display.png` | `simulation/display_fig.py` |
+| 4 | `fig_datapath.png` | `simulation/fig_datapath.py` |
+| 5 | `fig_regions.png` | `simulation/figs_core.py` |
+| 6 | `fig_response_times.png` | `simulation/figs_core.py` |
+| 7 | `fig_storage.png` | `simulation/figs_legacy.py` |
+| 8 | `fig_functional.png` | `simulation/figs_legacy.py` |
+| 9 | `fig_fare_perkm.png` | `simulation/figs_legacy.py` |
+| 10 to 16 | `fig_fares.png`, `fig_load_profile.png`, `fig_seat_error.png`, `fig_eta_error.png`, `fig_staleness.png`, `fig_temperature.png`, `fig_outcomes.png` | `simulation/analyze.py` |
+| 17 | `fig_sensitivity.png` | `simulation/figs_sens.py` |
 
-## Architecture
+## Reproducing the results
 
-```
-ESP32 (Wokwi)
-    │  sensors: pressure, temperature, GPS, face-scan
-    ↓  WiFi → MQTT publish (broker.hivemq.com:1883)
-HiveMQ Broker
-    ↓  subscribe: vit/shuttle1/#
-FastAPI Backend (Python)
-    │  mqtt_client.py — background paho-mqtt thread
-    │  classify_seat(pressure, temperature) → AVAILABLE / OCCUPIED / BAG
-    ↓  SQLAlchemy ORM → SQLite
-SQLite Database (vit_shuttle.db)
-    ↓  REST API (16 endpoints)
-React Frontend (Vite + TypeScript)
-    │  7 pages, Tailwind CSS, Recharts, Lucide icons
-    ↓  polling every 3 s
+Tested with Python 3.13, SUMO 1.28, Node.js 18+.
 
-Python Tkinter GUI (vit_smart_shuttle_gui.py)
-    ↓  independent sensor cross-validation
-```
-
-### Architecture Diagrams
-
-| Multi-Tier IoT Architecture | Processing Pipeline |
-|---|---|
-| ![Multi-Tier Architecture](docs/diagrams/IoT_Complete_Multi-Tier_Architecture.png) | ![Processing Pipeline](docs/diagrams/IoT_Processing_Pipeline_Flow_Diagram.png) |
-
----
-
-## Repository Structure
-
-```
-vit-smart-shuttle/
-├── src/                        # React + TypeScript frontend
-│   ├── pages/                  # 7 pages (Dashboard, LiveShuttle, SeatAllocation,
-│   │                           #   Students, ShuttleRequests, TripsAndBilling, VehicleLogs)
-│   ├── components/             # Shared UI components + BackendOffline
-│   ├── services/
-│   │   ├── api.ts              # Real FastAPI REST client (no silent fallback)
-│   │   └── mockApi.ts          # Preserved mock layer
-│   ├── data/mockData.ts        # Chart mock data (clearly isolated with TODOs)
-│   └── types/index.ts          # TypeScript types
-├── backend/                    # FastAPI + SQLite backend
-│   ├── main.py                 # App entry point, MQTT startup hook
-│   ├── mqtt_client.py          # paho-mqtt subscriber (background thread)
-│   ├── models.py               # SQLAlchemy ORM models
-│   ├── schemas.py              # Pydantic request/response schemas
-│   ├── seed.py                 # Database seeder (demo data)
-│   ├── requirements.txt
-│   └── routers/                # 7 FastAPI routers (dashboard, students, shuttles,
-│                               #   seats, trips, requests, vehicle_logs)
-├── python-gui/
-│   └── vit_smart_shuttle_gui.py  # Tkinter cross-validation GUI
-├── docs/
-│   ├── VIT_Smart_Shuttle_IDF-B.docx            # Invention Disclosure Format B
-│   ├── VIT_Smart_Shuttle_Technical_Analysis_Report.docx
-│   ├── diagrams/               # Architecture PNGs
-│   └── screenshots/            # UI screenshots
-├── public/
-├── index.html
-├── package.json
-├── vite.config.ts
-└── .gitignore
+```bash
+pip install -r requirements.txt
 ```
 
-> **Note:** The Wokwi firmware (`.ino`, `diagram.json`) lives online at  
-> **https://wokwi.com** — the project is browser-based and does not require local Arduino IDE.
+Unit tests for the reference module (44 tests, under a second):
 
----
+```bash
+cd reference
+python -m pytest -q
+```
 
-## Setup & Running
+Statistics and Fig. 17 straight from the stored run summaries (no SUMO needed):
 
-### Prerequisites
-- Node.js 18+
-- Python 3.11+
-- Git
+```bash
+cd simulation
+python stats.py
+python figs_sens.py
+```
 
----
+Full corridor simulation (5 seeds x 3 scenarios, about 75 s per run; route files are generated on the first run):
 
-### 1. Frontend (React + Vite)
+```bash
+cd simulation
+./runall.sh          # writes results/result_<scenario>_<seed>.json
+python analyze.py    # metrics.json and Figs. 10 to 16
+python display_fig.py
+./runsens.sh         # six sensitivity variants, seeds 1 to 3
+python stats.py      # Table 22 and the paired t-tests in Section 6.3
+python bench.py      # per-call timings
+python loadtest.py   # control-centre cycle for a 7,582-bus fleet
+```
+
+Scenarios: `A` has no display, `B_real` shows a board built from simulated sensors and links, `B_oracle` shows a board built from true seat counts. Behaviour, demand and network settings can be changed through `SEEK_PROB`, `WTW_RANGE_S`, `DEMAND_SCALE` and `OUTAGE_EVERY_S` environment variables.
+
+## Running the prototype
+
+Firmware: open [wokwi.com](https://wokwi.com), create an ESP32 project, paste `firmware/vit_shuttle_sketch.ino` and `firmware/diagram.json`, and add the libraries in `firmware/libraries.txt`. The sketch publishes to `broker.hivemq.com:1883` under `vit/shuttle1/#`.
+
+Back end:
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python seed.py
+uvicorn main:app --reload --port 8000
+```
+
+API docs are at `http://localhost:8000/docs`.
+
+Dashboard:
 
 ```bash
 npm install
 npm run dev
-# Opens at http://localhost:5173
 ```
 
-Build for production:
-```bash
-npm run build
-```
-
----
-
-### 2. Backend (FastAPI + SQLite)
-
-```bash
-cd backend
-
-# Create and activate virtual environment
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
-
-# Install dependencies (includes paho-mqtt)
-pip install -r requirements.txt
-
-# Seed the database with demo data
-python seed.py
-
-# Start the server
-uvicorn main:app --reload --port 8000
-# API docs at http://localhost:8000/docs
-# Health check: http://localhost:8000/api/health
-```
-
-On startup the backend automatically:
-- Connects to `broker.hivemq.com:1883`
-- Subscribes to `vit/shuttle1/#`
-- Processes GPS, seat-sensor, entry/exit, and network MQTT messages
-
----
-
-### 3. Python Cross-Validation GUI (Tkinter)
+Test program:
 
 ```bash
 cd python-gui
 python vit_smart_shuttle_gui.py
 ```
 
-No extra dependencies beyond Python standard library.
+## Key parameters
 
----
+| Parameter | Value |
+|---|---|
+| Pressure threshold | 1,200 ADC counts (12-bit), 3-sample debounce |
+| Default temperature band | 34 to 42 °C |
+| Environment setting | lower limit = cabin temperature + 2 °C; pressure-only mode above 33 °C |
+| Seat summary | every 10 s and on door close, about 200 bytes over MQTT; SMS every 30 s on GSM fallback |
+| Stop board | next 4 buses, rebuilt every 10 s, rows older than 60 s marked approximate |
+| Institutional fare | max(₹2, distance_km × ₹5) |
 
-### 4. Firmware (ESP32 / Wokwi)
+## Citation
 
-The firmware runs in the **online Wokwi simulator** — no local Arduino IDE needed.
-
-Open the project at: **https://wokwi.com** (search for VIT Smart Shuttle or use a saved project link)
-
-**Libraries used in the sketch:**
-- `PubSubClient` — MQTT client
-- `OneWire` + `DallasTemperature` — DS18B20 temperature sensor
-
-**Configuration constants in the sketch:**
-```cpp
-const char* MQTT_BROKER = "broker.hivemq.com";
-const int   MQTT_PORT   = 1883;
-const char* SHUTTLE_ID  = "VIT-SHUTTLE-01";
-const int   SEAT_NUMBER = 1;  // prototype: sensor on seat 1 only
-```
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health + MQTT connection status |
-| GET | `/api/dashboard/stats` | Passenger count, available seats, revenue |
-| GET | `/api/shuttles` | All shuttles with GPS + seat summary |
-| GET | `/api/shuttles/{id}/seats` | 30-seat grid for a shuttle |
-| POST | `/api/shuttles/{id}/seats/{n}/sensor` | REST sensor update (pressure + temperature) |
-| POST | `/api/trips/entry` | Record passenger boarding |
-| POST | `/api/trips/exit` | Complete trip + calculate fare |
-| GET | `/api/trips` | Full trip history with fares |
-| GET | `/api/students` | Student registry |
-| GET | `/api/requests` | Shuttle demand requests |
-| GET | `/api/vehicle-logs` | Event log |
-
----
-
-## Seat Classification Logic
-
-```python
-def classify_seat(pressure: str, temperature: float) -> str:
-    if pressure == "LOW":
-        return "AVAILABLE"
-    elif 36.1 <= temperature <= 37.2:
-        return "OCCUPIED"
-    else:
-        return "BAG"   # stored as BAG_DETECTED in API responses
-```
-
-This single function is called by both the REST sensor endpoint and the MQTT handler — no duplicated logic.
-
----
-
-## Documentation
-
-- [Invention Disclosure Format B (IDF-B)](docs/VIT_Smart_Shuttle_IDF-B.docx)
-- [Technical Analysis Report](docs/VIT_Smart_Shuttle_Technical_Analysis_Report.docx)
-
----
+If you use this code, please cite the paper (see `CITATION.cff`).
 
 ## Author
 
-**Gurirath Singh Khurana**  
-Registration No: 25BAI0153  
-B.Tech Artificial Intelligence & Data Science  
-VIT Vellore
+Gurirath Singh Khurana, Department of Computer Science and Engineering (AI/ML), School of Computer Science Engineering and Information Systems, Vellore Institute of Technology, Vellore, India.
+
+## License
+
+MIT, see `LICENSE`.
