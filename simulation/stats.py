@@ -1,8 +1,8 @@
-"""Paired statistics for the main runs and the sensitivity variants (Section 6.3, Table 22).
+"""Paired statistics for the main runs, the coefficient grid and the sensitivity variants (Section 6.3, Table 27, Figs. 19 and 20).
 
 Pairs scenario B_real with scenario A by seed (common random numbers) and writes
 results/stats.json. Uses the raw result_*.json files when they exist (after running
-runall.sh and runsens.sh) and falls back to results/run_summaries.json otherwise.
+runall.sh) and falls back to results/run_summaries.json otherwise.
 """
 import json
 import os
@@ -37,7 +37,12 @@ def per_run(s):
 
 
 def load(variant, scenario):
-    d = os.path.join(HERE, "results") if variant == "main" else os.path.join(HERE, "results_sens", variant)
+    if variant == "main":
+        d = os.path.join(HERE, "results")
+    elif variant.startswith("bw"):
+        d = os.path.join(HERE, "results_grid", variant)
+    else:
+        d = os.path.join(HERE, "results_sens", variant)
     out = {}
     for f in glob(os.path.join(d, f"result_{scenario}_*.json")):
         seed = int(f.rsplit("_", 1)[1].split(".")[0])
@@ -53,6 +58,8 @@ def load(variant, scenario):
 
 def paired(variant):
     a, b = load(variant, "A"), load(variant, "B_real")
+    if not a:
+        a = load("main", "A")
     seeds = sorted(set(a) & set(b))
     res = {"seeds": seeds}
     for k in ["seated", "seeker_wait", "all_wait", "refusals"]:
@@ -69,10 +76,47 @@ def paired(variant):
     return res
 
 
-VARIANTS = ["seek40", "seek80", "tolhalf", "outage3x", "demand120", "demand80"]
+VARIANTS = ["seek40", "seek80", "noshelter", "outage3x", "demand120", "demand80"]
+BETA_WAIT = [-0.15, -0.25, -0.35, -0.5, -0.7]
+BETA_SEAT = [0.5, 1.0, 2.0, 3.0, 4.0]
+
+
+def grid():
+    out = {}
+    for bw in BETA_WAIT:
+        for bs in BETA_SEAT:
+            tag = f"bw{bw}_bs{bs}"
+            if bw == -0.35 and bs == 2.0:
+                r = paired("main")
+                seeds = [s for s in r["seeds"] if s in (1, 2, 3)]
+                a, b = load("main", "A"), load("main", "B_real")
+                diff = [b[s]["seated"] - a[s]["seated"] for s in seeds]
+                wd = [b[s]["seeker_wait"] - a[s]["seeker_wait"] for s in seeds]
+                rf = [b[s]["refusals"] for s in seeds]
+                ra = [a[s]["refusals"] for s in seeds]
+                sk = [b[s]["skip_share"] for s in seeds]
+            else:
+                a, b = load("main", "A"), load(tag, "B_real")
+                seeds = sorted(set(a) & set(b))
+                if not seeds:
+                    continue
+                diff = [b[s]["seated"] - a[s]["seated"] for s in seeds]
+                wd = [b[s]["seeker_wait"] - a[s]["seeker_wait"] for s in seeds]
+                rf = [b[s]["refusals"] for s in seeds]
+                ra = [a[s]["refusals"] for s in seeds]
+                sk = [b[s]["skip_share"] for s in seeds]
+            out[tag] = {"beta_wait": bw, "beta_seat": bs, "seeds": seeds, "seated_gain": st.mean(diff),
+                        "positive_seeds": sum(x > 0 for x in diff), "wait_delta_min": st.mean(wd),
+                        "refusal_change": (st.mean(rf) - st.mean(ra)) / st.mean(ra), "skip_share": st.mean(sk)}
+    return out
 
 if __name__ == "__main__":
-    out = {"main": paired("main"), "sens": {v: paired(v) for v in VARIANTS}}
+    out = {"main": paired("main"), "sens": {}, "grid": grid()}
+    for v in VARIANTS:
+        try:
+            out["sens"][v] = paired(v)
+        except Exception as ex:
+            print("skip", v, ex)
     json.dump(out, open(os.path.join(HERE, "results", "stats.json"), "w"), indent=1)
     m = out["main"]
     print("main", {k: (round(m[k]["diff"], 4), round(m[k].get("p", 1), 5)) for k in ["seated", "seeker_wait", "all_wait", "refusals"]}, round(m["refusal_change"], 3))

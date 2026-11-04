@@ -17,6 +17,7 @@ import sumo
 from build_scenario import build, SIM_END, STOP_POS, STOP_LEN
 from transit_core import (
     SeatConfig, configure_for_environment, EMPTY, OBJECT, OCCUPIED, build_seat_summary, encode,
+    ThermalConfig, differential_classify,
     build_sms_summary, build_nmea_rmc, parse_nmea_rmc, build_stop_board, IdentityMode, verify_rider,
     fare_record, slab_policy, stage_policy, per_km_policy, flat_policy,
 )
@@ -30,7 +31,13 @@ M_PER_DEG_LON = 111320.0 * math.cos(math.radians(LAT0))
 DEMAND_SCALE = float(os.environ.get("DEMAND_SCALE", "1.0"))
 ARRIVAL_PER_MIN = [v * DEMAND_SCALE for v in [1.5] * 12 + [0.8] * 5 + [0.4] * 2 + [0.0]]
 SEEK_PROB = float(os.environ.get("SEEK_PROB", "0.6"))
-WTW_RANGE_S = tuple(float(x) for x in os.environ.get("WTW_RANGE_S", "120,780").split(","))
+BETA_0 = float(os.environ.get("BETA_0", "0.0"))
+BETA_WAIT = float(os.environ.get("BETA_WAIT", "-0.35"))
+BETA_SEAT = float(os.environ.get("BETA_SEAT", "2.0"))
+BETA_CROWD = float(os.environ.get("BETA_CROWD", "1.0"))
+BETA_WAITED = float(os.environ.get("BETA_WAITED", "-0.2"))
+KAPPA_EXPOSURE = float(os.environ.get("KAPPA_EXPOSURE", "0.5"))
+SHELTER_SHARE = float(os.environ.get("SHELTER_SHARE", "0.5"))
 DWELL_BASE, DWELL_BOARD, DWELL_ALIGHT = 10.0, 2.0, 1.5
 PUBLISH_EVERY = 10
 SMS_EVERY = 30
@@ -41,7 +48,12 @@ DEAD_EDGES = {13}
 OUTAGE_RATE = 1 / float(os.environ.get("OUTAGE_EVERY_S", "1800"))
 OUTAGE_MEAN_S = 60
 MAIN_AMBIENT = 31.0
-AMBIENTS = [22.0, 25.0, 28.0, 30.0, 31.0, 32.0, 34.0, 36.0, 38.0, 40.0]
+AMBIENTS = [22.0, 25.0, 28.0, 30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 40.0, 42.0]
+AMBIENTS_V1 = {22.0, 25.0, 28.0, 30.0, 31.0, 32.0, 34.0, 36.0, 38.0, 40.0}
+SKIN_PULL = 0.15
+BAG_TAU_S = 600.0
+BAG_INIT_SD = 3.0
+THERMAL_CFG = ThermalConfig()
 BAG_PROB = 0.08
 LIGHT_BAG_PROB = 0.3
 TAU_S = 45.0
@@ -58,7 +70,7 @@ def to_latlon(x, y):
 
 
 class Passenger:
-    __slots__ = ("pid", "origin", "dest", "t_arrive", "wants_seat", "wtw", "t_board", "seated_at_board",
+    __slots__ = ("pid", "origin", "dest", "t_arrive", "wants_seat", "t_board", "seated_at_board",
                  "seat_time", "stand_time", "skips", "t_first_skip", "bus", "credential", "female_free")
 
     def __init__(self, pid, origin, dest, t, rng):
@@ -67,7 +79,7 @@ class Passenger:
         self.dest = dest
         self.t_arrive = t
         self.wants_seat = rng.random() < SEEK_PROB
-        self.wtw = rng.uniform(*WTW_RANGE_S)
+        rng.uniform(120.0, 780.0)
         self.t_board = None
         self.seated_at_board = False
         self.seat_time = 0.0
@@ -88,6 +100,9 @@ class Bus:
         self.obj_light = [False] * SEATS
         self.sit_time = np.zeros(SEATS)
         self.skin = np.full(SEATS, 35.3)
+        self.obj_time = np.zeros(SEATS)
+        self.obj_init = np.zeros(SEATS)
+        self.rng2 = np.random.default_rng(rng.bit_generator.seed_seq.spawn(1)[0])
         self.standing = []
         self.onboard = {}
         self.served = -1
@@ -206,13 +221,15 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
     pending = []
     waiting = [[] for _ in range(nstops)]
     passengers = []
+    shelter = np.random.default_rng(seed + 7777).random(nstops) < SHELTER_SHARE
     buses = {}
     pid = 0
     arrivals_log = []
     eta_preds = defaultdict(list)
     staleness = {k: [] for k in clouds}
     free_err_t = []
-    conf = {a: {"fixed": np.zeros((2, 2), dtype=np.int64), "env": np.zeros((2, 2), dtype=np.int64)} for a in AMBIENTS}
+    conf = {a: {k: np.zeros((2, 2), dtype=np.int64) for k in ("fixed", "env", "diff")} for a in AMBIENTS}
+    blind = {a: 0 for a in AMBIENTS}
     trips = []
     fares = []
     traj = []
@@ -273,7 +290,7 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
                     si = int(stops[0].stoppingPlaceID[1:]) - 1
                     if si > bus.served:
                         arrivals_log.append(arrival_record(bus, si, t, clouds, shown))
-                        nb, na, lb = serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares)
+                        nb, na, lb = serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, shelter[si])
                         left_behind += lb
                         bus.dwell_until = t + DWELL_BASE + DWELL_BOARD * nb + DWELL_ALIGHT * na
                         bus.door_open = True
@@ -296,7 +313,7 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
             if bus.outage_until < t and rng.random() < OUTAGE_RATE:
                 bus.outage_until = t + rng.exponential(OUTAGE_MEAN_S)
 
-            sense(bus, t, cfg, default_cfg, conf, ambient)
+            sense(bus, t, cfg, default_cfg, conf, ambient, blind)
             est_free = sum(1 for s in bus.est_states if s == EMPTY)
             gt = bus.gt_free()
             free_err_t.append(est_free - gt)
@@ -351,6 +368,11 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
         msg_stats.append(dict(b.msgs, bus=vid, seconds=b.age))
     result = summarise(seed, scenario, passengers, arrivals_log, eta_preds, staleness, free_err_t, conf,
                        buses_msgs=msg_stats, left_behind=left_behind, trips=trips, fares=fares, wall=wall)
+    result["blind"] = {str(a): v for a, v in blind.items()}
+    result["shelter"] = shelter.astype(int).tolist()
+    result["params"] = {"BETA_0": BETA_0, "BETA_WAIT": BETA_WAIT, "BETA_SEAT": BETA_SEAT, "BETA_CROWD": BETA_CROWD,
+                        "BETA_WAITED": BETA_WAITED, "KAPPA_EXPOSURE": KAPPA_EXPOSURE, "SEEK_PROB": SEEK_PROB,
+                        "DEMAND_SCALE": DEMAND_SCALE, "OUTAGE_RATE": OUTAGE_RATE}
     result["traj"] = traj
     result["snapshots"] = snapshots
     with open(os.path.join(out_dir, f"result_{scenario}_{seed}.json"), "w") as f:
@@ -380,7 +402,13 @@ def arrival_record(bus, si, t, clouds, shown):
     return rec
 
 
-def skip_decision(p, bus, si, t, scenario, shown):
+def wait_utility(eta_min, p_seat_next, load_frac, waited_min, sheltered):
+    exposure = 1.0 + (0.0 if sheltered else KAPPA_EXPOSURE)
+    return (BETA_0 + BETA_WAIT * exposure * eta_min + BETA_SEAT * p_seat_next
+            + BETA_CROWD * load_frac + BETA_WAITED * waited_min)
+
+
+def skip_decision(p, bus, si, t, scenario, shown, rng, sheltered, seekers_waiting):
     if scenario == "A" or not p.wants_seat:
         return False
     cname = "fallback" if scenario == "B_real" else "oracle"
@@ -396,11 +424,19 @@ def skip_decision(p, bus, si, t, scenario, shown):
             later.append(row)
     if this_row is None or this_row["free_seats"] > 0:
         return False
-    tolerance = p.wtw - (t - p.t_first_skip if p.t_first_skip is not None else 0)
+    best = None
     for row in later:
-        if row["bus"] != bus.vid and row["free_seats"] > 0 and row["eta_min"] * 60 <= tolerance and row["eta_min"] * 60 > 0:
-            return True
-    return False
+        if row["free_seats"] > 0 and row["eta_min"] > 0:
+            if best is None or row["eta_min"] < best["eta_min"]:
+                best = row
+    if best is None:
+        return False
+    p_seat = min(1.0, best["free_seats"] / max(1, seekers_waiting))
+    load_frac = bus.load() / float(SEATS + STANDING)
+    waited = (t - p.t_first_skip) / 60.0 if p.t_first_skip is not None else 0.0
+    u = wait_utility(best["eta_min"], p_seat, load_frac, waited, sheltered)
+    p_wait = 1.0 / (1.0 + math.exp(-u))
+    return rng.random() < p_wait
 
 
 def take_seat(bus, p):
@@ -425,10 +461,12 @@ def take_seat(bus, p):
             j = rest[0]
             bus.seat_obj[j] = p.pid
             bus.obj_light[j] = bus.rng.random() < LIGHT_BAG_PROB
+            bus.obj_time[j] = 0.0
+            bus.obj_init[j] = bus.rng2.normal(0.0, BAG_INIT_SD)
     return True
 
 
-def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares):
+def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, sheltered=True):
     alight = [p for p in bus.onboard.values() if p.dest == si]
     for p in alight:
         del bus.onboard[p.pid]
@@ -455,13 +493,14 @@ def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares):
     boarded = 0
     lb = 0
     queue = waiting[si]
+    seekers_waiting = sum(1 for q in queue if q.wants_seat)
     stay = []
     for p in queue:
         if bus.load() >= SEATS + STANDING:
             stay.append(p)
             lb += 1
             continue
-        if skip_decision(p, bus, si, t, scenario, shown):
+        if skip_decision(p, bus, si, t, scenario, shown, rng, sheltered, seekers_waiting):
             p.skips += 1
             if p.t_first_skip is None:
                 p.t_first_skip = t
@@ -479,7 +518,7 @@ def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares):
     return boarded, len(alight), lb
 
 
-def sense(bus, t, cfg, default_cfg, conf, ambient):
+def sense(bus, t, cfg, default_cfg, conf, ambient, blind):
     rng = bus.rng
     occ = np.array([o is not None for o in bus.seat_occ])
     obj = np.array([(o is not None) and (bus.seat_occ[i] is None) for i, o in enumerate(bus.seat_obj)])
@@ -496,15 +535,27 @@ def sense(bus, t, cfg, default_cfg, conf, ambient):
     pressure = np.where(obj, pb, pressure)
     pressure = np.clip(pressure, 0, 4095)
     bus.sit_time = np.where(occ, bus.sit_time + 1, 0.0)
+    bus.obj_time = np.where(obj, bus.obj_time + 1, 0.0)
     noise = rng.normal(0, 0.25, SEATS)
+    rng2 = bus.rng2
 
-    def temps(amb):
+    def temps_v1(amb):
         t_occ = bus.skin + (amb - bus.skin) * np.exp(-bus.sit_time / TAU_S)
         t_obj = amb + rng.normal(0, 0.4, SEATS)
         base = np.full(SEATS, amb)
         return np.where(occ, t_occ, np.where(obj, t_obj, base)) + noise
 
-    tm = temps(ambient)
+    def temps(amb, lag=0.0, noise_sd=0.25):
+        contact = bus.skin + SKIN_PULL * (amb - bus.skin)
+        st = np.maximum(bus.sit_time - lag, 0.0)
+        ot = np.maximum(bus.obj_time - lag, 0.0)
+        t_occ = contact + (amb - contact) * np.exp(-st / TAU_S)
+        t_obj = amb + bus.obj_init * np.exp(-ot / BAG_TAU_S)
+        base = np.full(SEATS, amb)
+        out = np.where(occ, t_occ, np.where(obj, t_obj, base))
+        return out + rng2.normal(0, noise_sd, SEATS)
+
+    tm = temps_v1(ambient)
     for i in range(SEATS):
         p = pressure[i]
         if p < cfg.pressure_threshold:
@@ -529,15 +580,25 @@ def sense(bus, t, cfg, default_cfg, conf, ambient):
 
     if t % 5 == 0:
         settled = occ & (bus.sit_time > 90)
-        heavy_obj = obj & ~light
+        heavy_obj = obj & ~light & (bus.obj_time > 90)
+        lag = np.minimum(np.where(occ, bus.sit_time, bus.obj_time), THERMAL_CFG.window_s)
         for amb in AMBIENTS:
-            ta = temps(amb)
+            if amb in AMBIENTS_V1:
+                rng.normal(0, 0.4, SEATS)
+            sd5 = 0.25 / math.sqrt(THERMAL_CFG.smooth_n)
+            ta = temps(amb, 0.0, sd5)
+            tb = temps(amb, lag, sd5)
             env = configure_for_environment(default_cfg, amb)
-            for key, c in (("fixed", default_cfg), ("env", env)):
+            cabin = amb + rng2.normal(0, sd5, SEATS)
+            for key, c in (("fixed", default_cfg), ("env", env), ("diff", None)):
                 for mask, truth in ((settled, 0), (heavy_obj, 1)):
-                    idx = np.where(mask)[0]
-                    for i in idx:
-                        if not c.temperature_check_enabled or (c.temp_min_c <= ta[i] <= c.temp_max_c):
+                    for i in np.where(mask)[0]:
+                        if key == "diff":
+                            state, flag = differential_classify(ta[i] - cabin[i], tb[i] - cabin[i], ta[i], cabin[i], THERMAL_CFG)
+                            pred = 0 if state == OCCUPIED else 1
+                            if flag == "blind":
+                                blind[amb] += 1
+                        elif not c.temperature_check_enabled or (c.temp_min_c <= ta[i] <= c.temp_max_c):
                             pred = 0
                         else:
                             pred = 1

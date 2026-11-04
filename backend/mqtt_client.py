@@ -80,11 +80,11 @@ def process_gps(db, payload):
     print("[MQTT] GPS updated\nShuttle: VIT-SHUTTLE-01")
 
 def process_seat(db, payload):
-    # Sketch payload: "STATE,TEMP=36.7,PRESSURE=1250" where STATE is EMPTY/OBJECT/STUDENT
+    # Sketch payload: "STATE,TEMP=36.7,PRESSURE=1250[,CABIN=31.2,FLAG=THERMAL]" where STATE is EMPTY/OBJECT/STUDENT
     # (the ESP32 already classifies the seat itself; we don't re-derive it here).
     parts = payload.split(',')
-    if len(parts) != 3:
-        print(f"[MQTT] Seat parser: malformed payload {payload!r} (expected 3 comma parts) - ignoring")
+    if len(parts) < 3:
+        print(f"[MQTT] Seat parser: malformed payload {payload!r} (expected at least 3 comma parts) - ignoring")
         return
     state_name = parts[0].strip().upper()
     new_status = SEAT_STATE_TO_STATUS.get(state_name)

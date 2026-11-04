@@ -1,6 +1,7 @@
 import glob
 import json
 import os
+import sys
 from collections import defaultdict
 
 import numpy as np
@@ -33,7 +34,8 @@ def ci95(vals):
     v = np.array(vals, dtype=float)
     if len(v) < 2:
         return float(v.mean()), 0.0
-    return float(v.mean()), float(1.96 * v.std(ddof=1) / np.sqrt(len(v)))
+    from scipy import stats
+    return float(v.mean()), float(stats.t.ppf(0.975, len(v) - 1) * v.std(ddof=1) / np.sqrt(len(v)))
 
 
 def main():
@@ -92,15 +94,19 @@ def main():
                  "max": float(v.max()), "over60": float((v > 60).mean()), "over30": float((v > 30).mean())}
     M["staleness"] = st
 
-    conf = defaultdict(lambda: {"fixed": np.zeros((2, 2)), "env": np.zeros((2, 2))})
+    keys = ("fixed", "env", "diff")
+    conf = defaultdict(lambda: {k: np.zeros((2, 2)) for k in keys})
+    blind = defaultdict(int)
     for r in allruns:
         for amb, d in r["conf"].items():
-            for k in ("fixed", "env"):
+            for k in keys:
                 conf[amb][k] += np.array(d[k])
+        for amb, v in r.get("blind", {}).items():
+            blind[amb] += v
     temp = {}
     for amb in sorted(conf, key=float):
-        temp[amb] = {}
-        for k in ("fixed", "env"):
+        temp[amb] = {"blind_share_of_bags": float(blind[amb] / max(1, conf[amb]["diff"][1].sum()))}
+        for k in keys:
             m = conf[amb][k]
             temp[amb][k] = {"person_as_object": float(m[0, 1] / max(1, m[0].sum())),
                             "object_as_person": float(m[1, 0] / max(1, m[1].sum())),
@@ -225,16 +231,22 @@ def figures(M, A, BR, BO, allruns):
 
     amb = sorted(M["temperature"], key=float)
     ta = [float(a) for a in amb]
-    fig, axs = plt.subplots(1, 2, figsize=(6.6, 2.8), sharey=True)
+    fig, axs = plt.subplots(1, 2, figsize=(6.6, 2.9), sharey=True)
+    sys.path.insert(0, os.path.join(HERE, "..", "reference"))
+    from transit_core import ThermalConfig
+    blo, bhi = ThermalConfig().blind_band()
     for ax, key, title in ((axs[0], "person_as_object", "Seated person read as OBJECT"), (axs[1], "object_as_person", "Bag read as OCCUPIED")):
-        ax.plot(ta, [M["temperature"][a]["fixed"][key] * 100 for a in amb], color=S2, lw=2, marker="s", ms=5, label="Fixed 34-42 °C band")
-        ax.plot(ta, [M["temperature"][a]["env"][key] * 100 for a in amb], color=S1, lw=2, marker="o", ms=5, label="Band set for environment (pressure-only from 32 °C)")
+        ax.axvspan(blo, bhi, color="#d9d9d9", alpha=0.6, lw=0)
+        ax.plot(ta, [M["temperature"][a]["fixed"][key] * 100 for a in amb], color=S2, lw=1.6, marker="s", ms=4, label="Fixed 34-42 °C band")
+        ax.plot(ta, [M["temperature"][a]["env"][key] * 100 for a in amb], color="#999999", lw=1.6, marker="^", ms=4, ls="--", label="Earlier environment setting (pressure-only above 31 °C)")
+        ax.plot(ta, [M["temperature"][a]["diff"][key] * 100 for a in amb], color=S1, lw=2, marker="o", ms=4, label="Differential rule with cabin probe")
         ax.set_title(title, fontsize=10, color=INK)
         ax.set_xlabel("Cabin ambient temperature (°C)")
     axs[0].set_ylabel("Misclassified (%)")
     h, l = axs[1].get_legend_handles_labels()
     fig.subplots_adjust(bottom=0.3)
-    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, -0.02), ncol=2, fontsize=9)
+    axs[1].text((blo + bhi) / 2, 104, "blind band", ha="center", fontsize=8, color="#555555")
+    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, -0.06), ncol=2, fontsize=8)
     fig.savefig(os.path.join(FIG, "fig_temperature.png"))
     plt.close(fig)
 
@@ -255,7 +267,7 @@ def figures(M, A, BR, BO, allruns):
     fig.savefig(os.path.join(FIG, "fig_outcomes.png"))
     plt.close(fig)
 
-    import math, sys
+    import math
     sys.path.insert(0, os.path.join(HERE, "..", "reference"))
     from transit_core import base_fare, slab_policy, stage_policy, per_km_policy, flat_policy
     pols = [("Distance slab (5/10/15)", slab_policy([(4, 5), (10, 10), (math.inf, 15)]), S1, "-"),

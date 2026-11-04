@@ -51,7 +51,9 @@ OneWire oneWire(TEMP_PIN);
 DallasTemperature tempSensor(&oneWire);
 
 float currentTemperature = 36.7;
+float cabinTemperature = NAN;
 float lastTemperature = -999.0;
+int probeCount = 0;
 
 unsigned long lastTempRequest = 0;
 const unsigned long TEMP_INTERVAL = 1000;
@@ -84,6 +86,45 @@ const float HUMAN_TEMP_MAX = 42.0;
 
 int seatState = 0;
 int previousSeatState = -1;
+
+const unsigned long SEAT_SAMPLE_MS = 100;
+const float EMA_ALPHA = 0.25f;
+const int EXIT_THRESHOLD = 1000;
+const float BASELINE_RATE = 0.002f;
+const float BASELINE_CAP = 400.0f;
+
+int pressureWindow[5] = {0, 0, 0, 0, 0};
+int pressureIdx = 0;
+bool pressureWindowFull = false;
+float pressureEma = 0.0f;
+bool pressureEmaInit = false;
+float pressureBaseline = 0.0f;
+bool seatLoaded = false;
+int lastPressureRaw = 0;
+unsigned long lastSeatSample = 0;
+
+const float EPS_THERMAL = 1.5f;
+const float CONTACT_MIN = 29.0f;
+const float CONTACT_MAX = 38.5f;
+const float CONTACT_NOMINAL = 35.0f;
+const float SKIN_PULL = 0.15f;
+const float CONTACT_TOL = 2.0f;
+const float BLIND_MARGIN = 1.2f;
+const float DECAY_TOL = 0.8f;
+const unsigned long SETTLE_MS = 60000;
+const unsigned long WINDOW_MS = 300000;
+const int HIST_LEN = 310;
+const int SMOOTH_N = 5;
+
+float deltaHist[HIST_LEN];
+float seatHist[HIST_LEN];
+float cabinHist[HIST_LEN];
+unsigned long deltaTime[HIST_LEN];
+int histHead = 0;
+int histCount = 0;
+unsigned long loadedSince = 0;
+int thermalFlag = 0;
+const char* FLAG_NAMES[] = {"THERMAL", "BLIND", "SETTLING", "PROBE_FAULT"};
 
 
 // ============================================================
@@ -247,6 +288,43 @@ void requestTemperature()
   lastTempRequest = millis();
 }
 
+bool probeValid(float t)
+{
+  return !isnan(t) && t > -10.0 && t < 85.0;
+}
+
+void pushDelta(float delta)
+{
+  deltaHist[histHead] = delta;
+  seatHist[histHead] = currentTemperature;
+  cabinHist[histHead] = cabinTemperature;
+  deltaTime[histHead] = millis();
+  histHead = (histHead + 1) % HIST_LEN;
+  if (histCount < HIST_LEN) histCount++;
+}
+
+float meanOf(const float* arr, bool newest)
+{
+  unsigned long now = millis();
+  int first = -1;
+  for (int i = 0; i < histCount; i++)
+  {
+    int idx = (histHead - histCount + i + HIST_LEN) % HIST_LEN;
+    if (now - deltaTime[idx] <= WINDOW_MS) { first = i; break; }
+  }
+  if (first < 0) return NAN;
+  int available = histCount - first;
+  int n = available < SMOOTH_N ? available : SMOOTH_N;
+  int start = newest ? histCount - n : first;
+  float sum = 0.0f;
+  for (int i = start; i < start + n; i++)
+  {
+    int idx = (histHead - histCount + i + HIST_LEN) % HIST_LEN;
+    sum += arr[idx];
+  }
+  return sum / n;
+}
+
 void updateTemperature()
 {
   if (millis() - lastTempRequest >= 1000)
@@ -256,8 +334,102 @@ void updateTemperature()
     {
       currentTemperature = newTemperature;
     }
+    if (probeCount > 1)
+    {
+      float newCabin = tempSensor.getTempCByIndex(1);
+      cabinTemperature = probeValid(newCabin) ? newCabin : NAN;
+    }
+    if (seatLoaded && probeValid(currentTemperature) && probeValid(cabinTemperature))
+    {
+      pushDelta(currentTemperature - cabinTemperature);
+    }
     requestTemperature();
   }
+}
+
+int median5Pressure()
+{
+  int n = pressureWindowFull ? 5 : pressureIdx;
+  if (n == 0) return 0;
+  int v[5];
+  for (int i = 0; i < n; i++) v[i] = pressureWindow[i];
+  for (int i = 1; i < n; i++)
+  {
+    int k = v[i];
+    int j = i - 1;
+    while (j >= 0 && v[j] > k) { v[j + 1] = v[j]; j--; }
+    v[j + 1] = k;
+  }
+  return v[n / 2];
+}
+
+void samplePressure()
+{
+  if (millis() - lastSeatSample < SEAT_SAMPLE_MS) return;
+  lastSeatSample = millis();
+  lastPressureRaw = analogRead(SEAT_PIN);
+  pressureWindow[pressureIdx] = lastPressureRaw;
+  pressureIdx = (pressureIdx + 1) % 5;
+  if (pressureIdx == 0) pressureWindowFull = true;
+  int med = median5Pressure();
+  if (!pressureEmaInit) { pressureEma = med; pressureEmaInit = true; }
+  else pressureEma = EMA_ALPHA * med + (1.0f - EMA_ALPHA) * pressureEma;
+  float net = pressureEma - pressureBaseline;
+  bool before = seatLoaded;
+  if (!seatLoaded && net >= PRESSURE_THRESHOLD) seatLoaded = true;
+  else if (seatLoaded && net < EXIT_THRESHOLD) seatLoaded = false;
+  if (seatLoaded && !before)
+  {
+    loadedSince = millis();
+    histCount = 0;
+  }
+  if (!seatLoaded)
+  {
+    pressureBaseline += BASELINE_RATE * (pressureEma - pressureBaseline);
+    if (pressureBaseline < 0) pressureBaseline = 0;
+    if (pressureBaseline > BASELINE_CAP) pressureBaseline = BASELINE_CAP;
+  }
+}
+
+int classifyLoadedSeat()
+{
+  if (!probeValid(currentTemperature))
+  {
+    thermalFlag = 3;
+    return 2;
+  }
+  if (!probeValid(cabinTemperature))
+  {
+    thermalFlag = 3;
+    return (currentTemperature >= HUMAN_TEMP_MIN && currentTemperature <= HUMAN_TEMP_MAX) ? 2 : 1;
+  }
+  if (millis() - loadedSince < SETTLE_MS)
+  {
+    thermalFlag = 2;
+    return 2;
+  }
+  thermalFlag = 0;
+  if (histCount == 0) return 2;
+  float seatNow = meanOf(seatHist, true);
+  float cabinNow = meanOf(cabinHist, true);
+  float deltaNow = meanOf(deltaHist, true);
+  float deltaThen = meanOf(deltaHist, false);
+  if (seatNow > CONTACT_MAX || seatNow < CONTACT_MIN) return 1;
+  float a = fabs(deltaNow);
+  float b = fabs(deltaThen);
+  if (a >= EPS_THERMAL)
+  {
+    float expected = CONTACT_NOMINAL + SKIN_PULL * (cabinNow - CONTACT_NOMINAL);
+    if (fabs(seatNow - expected) > CONTACT_TOL) return 1;
+    return (a < b - DECAY_TOL) ? 1 : 2;
+  }
+  float half = EPS_THERMAL / (1.0f - SKIN_PULL) + BLIND_MARGIN;
+  if (cabinNow >= CONTACT_NOMINAL - half && cabinNow <= CONTACT_NOMINAL + half)
+  {
+    thermalFlag = 1;
+    return 2;
+  }
+  return 1;
 }
 
 
@@ -421,14 +593,12 @@ void checkGPS()
 
 void checkSeat()
 {
-  int pressure = analogRead(SEAT_PIN);
-  bool pressureDetected = pressure >= PRESSURE_THRESHOLD;
-  bool humanTemperature = currentTemperature >= HUMAN_TEMP_MIN && currentTemperature <= HUMAN_TEMP_MAX;
+  samplePressure();
+  int pressure = (int)(pressureEma - pressureBaseline);
 
   int newState;
-  if (!pressureDetected)       newState = 0;       // EMPTY
-  else if (humanTemperature)   newState = 2;        // STUDENT
-  else                         newState = 1;        // OBJECT
+  if (!seatLoaded) newState = 0;
+  else             newState = classifyLoadedSeat();
 
   seatState = newState;
 
@@ -447,6 +617,11 @@ void checkSeat()
     Serial.print("Temperature : ");
     Serial.print(currentTemperature, 1);
     Serial.println(" C");
+    Serial.print("Cabin       : ");
+    Serial.print(cabinTemperature, 1);
+    Serial.println(" C");
+    Serial.print("Thermal     : ");
+    Serial.println(FLAG_NAMES[thermalFlag]);
     Serial.println("----------------------------------------");
 
     if (seatState == 0)      Serial.println("Result      : SEAT EMPTY");
@@ -455,7 +630,8 @@ void checkSeat()
 
     Serial.println("========================================");
 
-    String payload = String(getSeatName()) + ",TEMP=" + String(currentTemperature, 1) + ",PRESSURE=" + String(pressure);
+    String payload = String(getSeatName()) + ",TEMP=" + String(currentTemperature, 1) + ",PRESSURE=" + String(pressure)
+                     + ",CABIN=" + String(cabinTemperature, 1) + ",FLAG=" + String(FLAG_NAMES[thermalFlag]);
     publishMQTT("vit/shuttle1/seat", payload);
   }
 }
@@ -704,6 +880,7 @@ void setup()
   pinMode(DOOR_SWITCH, INPUT_PULLUP);
 
   tempSensor.begin();
+  probeCount = tempSensor.getDeviceCount();
   tempSensor.setResolution(9);
   tempSensor.setWaitForConversion(false);
 
@@ -717,7 +894,7 @@ void setup()
   Serial.println("[SYSTEM] ESP32 initialized");
   Serial.println("[SYSTEM] GPIO34 = seat pressure sensor");
   Serial.println("[SYSTEM] GPIO35 = GPS simulator");
-  Serial.println("[SYSTEM] GPIO18 = temperature sensor (DS18B20)");
+  Serial.println("[SYSTEM] GPIO18 = DS18B20 seat probe (index 0) + cabin probe (index 1)");
   Serial.println("[SYSTEM] GPIO4  = face scan button");
   Serial.println("[SYSTEM] GPIO5  = WiFi/GSM switch");
   Serial.println("[SYSTEM] GPIO19 = door open/closed switch");
@@ -731,11 +908,13 @@ void setup()
   currentTemperature = tempSensor.getTempCByIndex(0);
   if (currentTemperature < -100 || currentTemperature > 150) currentTemperature = 36.7;
 
-  int pressure = analogRead(SEAT_PIN);
-  if (pressure < PRESSURE_THRESHOLD) seatState = 0;
-  else if (currentTemperature >= HUMAN_TEMP_MIN && currentTemperature <= HUMAN_TEMP_MAX) seatState = 2;
-  else seatState = 1;
-  previousSeatState = seatState;
+  if (probeCount > 1)
+  {
+    cabinTemperature = tempSensor.getTempCByIndex(1);
+    if (!probeValid(cabinTemperature)) cabinTemperature = NAN;
+  }
+  seatState = 0;
+  previousSeatState = -1;
 
   previousWifiState = wifiAvailable();
 

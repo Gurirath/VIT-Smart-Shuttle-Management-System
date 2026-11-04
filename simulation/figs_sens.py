@@ -11,13 +11,15 @@ from stats import load
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIG = os.path.join(HERE, "..", "figures")
 VARS = [("base", "Base case"), ("seek40", "40% want a seat"), ("seek80", "80% want a seat"),
-        ("tolhalf", "Tolerance halved"), ("demand80", "Demand -20%"), ("demand120", "Demand +20%"),
+        ("noshelter", "No stop shelters"), ("demand80", "Demand -20%"), ("demand120", "Demand +20%"),
         ("outage3x", "Outages x3")]
 
 rows = []
 for k, lab in VARS:
     v = "main" if k == "base" else k
     a, b = load(v, "A"), load(v, "B_real")
+    if not a:
+        a = load("main", "A")
     seeds = sorted(set(a) & set(b))
     if not seeds:
         continue

@@ -1,0 +1,80 @@
+{
+ "assumptions": {
+  "fs_hz": 10.0,
+  "vib_rms_ms2": 0.7,
+  "shocks_per_min": 2.0,
+  "shock_g": [
+   0.4,
+   1.4
+  ],
+  "fsr_model": "R = 12300 * F^-1.3",
+  "divider_ohm": 10000.0,
+  "contact_area_m2": 0.09,
+  "peak_factor": 2.2,
+  "creep_per_decade": 0.05
+ },
+ "true_edges": 2,
+ "seed_run": {
+  "old_1hz_debounce": {
+   "transitions": 2,
+   "false_transitions": 0,
+   "error_share": 0.0011111111111111111,
+   "latency_s": [
+    2.0,
+    2.0
+   ]
+  },
+  "raw_10hz": {
+   "transitions": 40,
+   "false_transitions": 38,
+   "error_share": 0.0006388888888888889,
+   "latency_s": [
+    0.0,
+    0.0
+   ]
+  },
+  "median_ema_hysteresis": {
+   "transitions": 2,
+   "false_transitions": 0,
+   "error_share": 0.00019444444444444443,
+   "latency_s": [
+    0.4,
+    0.3
+   ]
+  }
+ },
+ "false_transitions_per_hour_20_runs": {
+  "old": {
+   "mean": 0.0,
+   "max": 0
+  },
+  "raw": {
+   "mean": 46.0,
+   "max": 60
+  },
+  "new": {
+   "mean": 0.0,
+   "max": 0
+  }
+ },
+ "ema_time_constant_s": 0.3476059496782207,
+ "ema_cutoff_hz": 0.457860238696217,
+ "ema_gain": {
+  "0.1": 0.977129928536042,
+  "0.5": 0.6781190635033021,
+  "1.0": 0.4231975614883866,
+  "2.0": 0.2384768350416259,
+  "5.0": 0.14285714285714285
+ },
+ "calibration_model": {
+  "threshold_mass_centred_kg": 24.0,
+  "threshold_mass_off_centre_kg": 52.0,
+  "adc_at_kg": {
+   "10": 503.87090250886945,
+   "30": 1511.8210451229158,
+   "45": 2038.6945362534793,
+   "70": 2611.746661337772,
+   "100": 3017.240852411878
+  }
+ }
+}

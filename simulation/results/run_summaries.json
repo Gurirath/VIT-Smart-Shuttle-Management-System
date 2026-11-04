@@ -1,475 +1,1024 @@
 {
- "demand120": {
+ "main": {
   "A_1": {
-   "all_mean_wait_s": 320.3957068516912,
-   "left_behind_events": 1188,
-   "passengers": 4612,
-   "seeker_mean_wait_s": 321.8768193113241,
-   "seekers": 2817,
-   "seekers_seated_at_board": 1031,
+   "seekers": 2295,
+   "seekers_seated_at_board": 1282,
+   "seeker_mean_wait_s": 249.3825708061002,
+   "all_mean_wait_s": 254.28230668414156,
+   "left_behind_events": 312,
    "skippers": 0
   },
   "A_2": {
-   "all_mean_wait_s": 360.72680189900734,
-   "left_behind_events": 1823,
-   "passengers": 4634,
-   "seeker_mean_wait_s": 363.43690736688546,
-   "seekers": 2742,
-   "seekers_seated_at_board": 1033,
+   "seekers": 2309,
+   "seekers_seated_at_board": 1218,
+   "seeker_mean_wait_s": 268.0303161541793,
+   "all_mean_wait_s": 273.78687258687256,
+   "left_behind_events": 364,
    "skippers": 0
   },
   "A_3": {
-   "all_mean_wait_s": 357.7087726697596,
-   "left_behind_events": 1805,
-   "passengers": 4742,
-   "seeker_mean_wait_s": 358.8697788697789,
+   "seekers": 2388,
+   "seekers_seated_at_board": 1125,
+   "seeker_mean_wait_s": 278.74832495812393,
+   "all_mean_wait_s": 274.5131611932815,
+   "left_behind_events": 466,
+   "skippers": 0
+  },
+  "A_4": {
+   "seekers": 2296,
+   "seekers_seated_at_board": 1174,
+   "seeker_mean_wait_s": 248.72560975609755,
+   "all_mean_wait_s": 250.1457404980341,
+   "left_behind_events": 177,
+   "skippers": 0
+  },
+  "A_5": {
+   "seekers": 2342,
+   "seekers_seated_at_board": 1193,
+   "seeker_mean_wait_s": 273.47566182749785,
+   "all_mean_wait_s": 277.5591888466413,
+   "left_behind_events": 422,
+   "skippers": 0
+  },
+  "B_oracle_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1446,
+   "seeker_mean_wait_s": 281.9355119825708,
+   "all_mean_wait_s": 270.47260812581914,
+   "left_behind_events": 211,
+   "skippers": 345
+  },
+  "B_oracle_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1432,
+   "seeker_mean_wait_s": 295.2061498484192,
+   "all_mean_wait_s": 278.63963963963965,
+   "left_behind_events": 193,
+   "skippers": 361
+  },
+  "B_oracle_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1279,
+   "seeker_mean_wait_s": 300.13651591289783,
+   "all_mean_wait_s": 278.2765104036099,
+   "left_behind_events": 298,
+   "skippers": 339
+  },
+  "B_oracle_4": {
+   "seekers": 2296,
+   "seekers_seated_at_board": 1359,
+   "seeker_mean_wait_s": 272.86149825783974,
+   "all_mean_wait_s": 259.3252948885976,
+   "left_behind_events": 116,
+   "skippers": 286
+  },
+  "B_oracle_5": {
+   "seekers": 2342,
+   "seekers_seated_at_board": 1328,
+   "seeker_mean_wait_s": 287.53415883859947,
+   "all_mean_wait_s": 272.5508238276299,
+   "left_behind_events": 234,
+   "skippers": 342
+  },
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1474,
+   "seeker_mean_wait_s": 280.0788671023965,
+   "all_mean_wait_s": 267.1200524246396,
+   "left_behind_events": 172,
+   "skippers": 339
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1446,
+   "seeker_mean_wait_s": 296.6097877869207,
+   "all_mean_wait_s": 277.3894465894466,
+   "left_behind_events": 191,
+   "skippers": 363
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1257,
+   "seeker_mean_wait_s": 307.4212730318258,
+   "all_mean_wait_s": 284.73477061920283,
+   "left_behind_events": 348,
+   "skippers": 336
+  },
+  "B_real_4": {
+   "seekers": 2296,
+   "seekers_seated_at_board": 1394,
+   "seeker_mean_wait_s": 276.79137630662024,
+   "all_mean_wait_s": 260.3129750982962,
+   "left_behind_events": 117,
+   "skippers": 296
+  },
+  "B_real_5": {
+   "seekers": 2342,
+   "seekers_seated_at_board": 1337,
+   "seeker_mean_wait_s": 290.1058923996584,
+   "all_mean_wait_s": 276.1731305449937,
+   "left_behind_events": 238,
+   "skippers": 341
+  }
+ },
+ "bw-0.15_bs0.5": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1498,
+   "seeker_mean_wait_s": 295.31459694989104,
+   "all_mean_wait_s": 273.1635648754915,
+   "left_behind_events": 137,
+   "skippers": 441
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1468,
+   "seeker_mean_wait_s": 316.09874404504114,
+   "all_mean_wait_s": 293.34028314028313,
+   "left_behind_events": 171,
+   "skippers": 472
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1336,
+   "seeker_mean_wait_s": 323.2001675041876,
+   "all_mean_wait_s": 293.65630483830535,
+   "left_behind_events": 304,
+   "skippers": 457
+  }
+ },
+ "bw-0.15_bs1.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1533,
+   "seeker_mean_wait_s": 307.05446623093684,
+   "all_mean_wait_s": 280.086500655308,
+   "left_behind_events": 139,
+   "skippers": 517
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1505,
+   "seeker_mean_wait_s": 330.7241229969684,
+   "all_mean_wait_s": 300.07541827541826,
+   "left_behind_events": 152,
+   "skippers": 543
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1346,
+   "seeker_mean_wait_s": 336.8961474036851,
+   "all_mean_wait_s": 301.0639257959388,
+   "left_behind_events": 273,
+   "skippers": 535
+  }
+ },
+ "bw-0.15_bs2.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1557,
+   "seeker_mean_wait_s": 351.9664488017429,
+   "all_mean_wait_s": 305.1931847968545,
+   "left_behind_events": 109,
+   "skippers": 683
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1551,
+   "seeker_mean_wait_s": 374.7821567778259,
+   "all_mean_wait_s": 323.4066924066924,
+   "left_behind_events": 122,
+   "skippers": 733
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1352,
+   "seeker_mean_wait_s": 379.9221105527638,
+   "all_mean_wait_s": 321.42216094259214,
+   "left_behind_events": 206,
+   "skippers": 725
+  }
+ },
+ "bw-0.15_bs3.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1597,
+   "seeker_mean_wait_s": 392.8575163398693,
+   "all_mean_wait_s": 329.7499344692005,
+   "left_behind_events": 97,
+   "skippers": 814
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1549,
+   "seeker_mean_wait_s": 434.07492420961455,
+   "all_mean_wait_s": 356.3011583011583,
+   "left_behind_events": 63,
+   "skippers": 945
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1423,
+   "seeker_mean_wait_s": 415.9886934673367,
+   "all_mean_wait_s": 341.93707696164455,
+   "left_behind_events": 176,
+   "skippers": 851
+  }
+ },
+ "bw-0.15_bs4.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1631,
+   "seeker_mean_wait_s": 442.46187363834423,
+   "all_mean_wait_s": 359.4961992136304,
+   "left_behind_events": 106,
+   "skippers": 935
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1586,
+   "seeker_mean_wait_s": 463.529666522304,
+   "all_mean_wait_s": 370.4036036036036,
+   "left_behind_events": 64,
+   "skippers": 994
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1425,
+   "seeker_mean_wait_s": 457.8856783919598,
+   "all_mean_wait_s": 366.6169466031587,
+   "left_behind_events": 162,
+   "skippers": 995
+  }
+ },
+ "bw-0.25_bs0.5": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1400,
+   "seeker_mean_wait_s": 272.6392156862745,
+   "all_mean_wait_s": 263.3142857142857,
+   "left_behind_events": 223,
+   "skippers": 249
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1399,
+   "seeker_mean_wait_s": 288.43135556517973,
+   "all_mean_wait_s": 277.38018018018016,
+   "left_behind_events": 196,
+   "skippers": 306
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1244,
+   "seeker_mean_wait_s": 297.62269681742043,
+   "all_mean_wait_s": 279.3504637753823,
+   "left_behind_events": 356,
+   "skippers": 268
+  }
+ },
+ "bw-0.25_bs1.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1481,
+   "seeker_mean_wait_s": 273.5006535947712,
+   "all_mean_wait_s": 260.513499344692,
+   "left_behind_events": 183,
+   "skippers": 311
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1431,
+   "seeker_mean_wait_s": 303.7206582936336,
+   "all_mean_wait_s": 285.93384813384813,
+   "left_behind_events": 193,
+   "skippers": 399
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1290,
+   "seeker_mean_wait_s": 307.6528475711893,
+   "all_mean_wait_s": 286.4650288292805,
+   "left_behind_events": 337,
+   "skippers": 345
+  }
+ },
+ "bw-0.25_bs2.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1511,
+   "seeker_mean_wait_s": 301.46187363834423,
+   "all_mean_wait_s": 276.44823066841417,
+   "left_behind_events": 132,
+   "skippers": 477
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1472,
+   "seeker_mean_wait_s": 320.2654828930273,
+   "all_mean_wait_s": 287.5171171171171,
+   "left_behind_events": 148,
+   "skippers": 509
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1317,
+   "seeker_mean_wait_s": 333.2106365159129,
+   "all_mean_wait_s": 299.1759839558787,
+   "left_behind_events": 274,
+   "skippers": 504
+  }
+ },
+ "bw-0.25_bs3.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1554,
+   "seeker_mean_wait_s": 329.72244008714597,
+   "all_mean_wait_s": 291.5394495412844,
+   "left_behind_events": 88,
+   "skippers": 610
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1513,
+   "seeker_mean_wait_s": 362.9982676483326,
+   "all_mean_wait_s": 311.3127413127413,
+   "left_behind_events": 113,
+   "skippers": 681
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1371,
+   "seeker_mean_wait_s": 354.5460636515913,
+   "all_mean_wait_s": 308.46628227625973,
+   "left_behind_events": 255,
+   "skippers": 611
+  }
+ },
+ "bw-0.25_bs4.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1590,
+   "seeker_mean_wait_s": 374.8553376906318,
+   "all_mean_wait_s": 319.10275229357796,
+   "left_behind_events": 129,
+   "skippers": 736
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1599,
+   "seeker_mean_wait_s": 401.16673884798615,
+   "all_mean_wait_s": 333.51428571428573,
+   "left_behind_events": 82,
+   "skippers": 824
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1376,
+   "seeker_mean_wait_s": 394.1319095477387,
+   "all_mean_wait_s": 333.7801453998496,
+   "left_behind_events": 252,
+   "skippers": 733
+  }
+ },
+ "bw-0.35_bs0.5": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1389,
+   "seeker_mean_wait_s": 263.89193899782134,
+   "all_mean_wait_s": 261.5019659239843,
+   "left_behind_events": 255,
+   "skippers": 189
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1367,
+   "seeker_mean_wait_s": 281.5474231268948,
+   "all_mean_wait_s": 275.75366795366796,
+   "left_behind_events": 244,
+   "skippers": 233
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1241,
+   "seeker_mean_wait_s": 289.01633165829145,
+   "all_mean_wait_s": 277.1451491601905,
+   "left_behind_events": 369,
+   "skippers": 225
+  }
+ },
+ "bw-0.35_bs1.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1408,
+   "seeker_mean_wait_s": 263.4152505446623,
+   "all_mean_wait_s": 258.23669724770645,
+   "left_behind_events": 232,
+   "skippers": 215
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1415,
+   "seeker_mean_wait_s": 286.94889562581204,
+   "all_mean_wait_s": 277.1132561132561,
+   "left_behind_events": 230,
+   "skippers": 300
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1268,
+   "seeker_mean_wait_s": 296.28978224455614,
+   "all_mean_wait_s": 282.4454750564051,
+   "left_behind_events": 402,
+   "skippers": 247
+  }
+ },
+ "bw-0.35_bs3.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1487,
+   "seeker_mean_wait_s": 289.8727668845316,
+   "all_mean_wait_s": 269.4390563564875,
+   "left_behind_events": 134,
+   "skippers": 416
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1489,
+   "seeker_mean_wait_s": 327.80467734950196,
+   "all_mean_wait_s": 291.66924066924065,
+   "left_behind_events": 131,
+   "skippers": 538
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1307,
+   "seeker_mean_wait_s": 328.14112227805697,
+   "all_mean_wait_s": 296.47430433692654,
+   "left_behind_events": 322,
+   "skippers": 445
+  }
+ },
+ "bw-0.35_bs4.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1520,
+   "seeker_mean_wait_s": 318.92549019607844,
+   "all_mean_wait_s": 286.0715596330275,
+   "left_behind_events": 142,
+   "skippers": 544
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1529,
+   "seeker_mean_wait_s": 348.66565612819403,
+   "all_mean_wait_s": 303.6751608751609,
+   "left_behind_events": 123,
+   "skippers": 643
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1354,
+   "seeker_mean_wait_s": 352.64824120603015,
+   "all_mean_wait_s": 309.62271245926297,
+   "left_behind_events": 290,
+   "skippers": 553
+  }
+ },
+ "bw-0.5_bs0.5": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1351,
+   "seeker_mean_wait_s": 254.58910675381264,
+   "all_mean_wait_s": 257.0560943643512,
+   "left_behind_events": 281,
+   "skippers": 90
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1338,
+   "seeker_mean_wait_s": 273.43828497184927,
+   "all_mean_wait_s": 274.66126126126125,
+   "left_behind_events": 276,
+   "skippers": 159
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1248,
+   "seeker_mean_wait_s": 282.4359296482412,
+   "all_mean_wait_s": 274.81323640010027,
+   "left_behind_events": 423,
+   "skippers": 132
+  }
+ },
+ "bw-0.5_bs1.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1379,
+   "seeker_mean_wait_s": 257.4100217864924,
+   "all_mean_wait_s": 257.7017038007864,
+   "left_behind_events": 268,
+   "skippers": 147
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1335,
+   "seeker_mean_wait_s": 277.11996535296663,
+   "all_mean_wait_s": 275.85740025740023,
+   "left_behind_events": 295,
+   "skippers": 167
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1262,
+   "seeker_mean_wait_s": 288.0967336683417,
+   "all_mean_wait_s": 277.6019052394084,
+   "left_behind_events": 408,
+   "skippers": 197
+  }
+ },
+ "bw-0.5_bs2.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1410,
+   "seeker_mean_wait_s": 258.66753812636165,
+   "all_mean_wait_s": 255.11507208387943,
+   "left_behind_events": 228,
+   "skippers": 193
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1405,
+   "seeker_mean_wait_s": 276.8549155478562,
+   "all_mean_wait_s": 269.9997425997426,
+   "left_behind_events": 225,
+   "skippers": 236
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1218,
+   "seeker_mean_wait_s": 287.95477386934675,
+   "all_mean_wait_s": 274.87139633993485,
+   "left_behind_events": 366,
+   "skippers": 217
+  }
+ },
+ "bw-0.5_bs3.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1452,
+   "seeker_mean_wait_s": 269.70849673202616,
+   "all_mean_wait_s": 261.32293577981653,
+   "left_behind_events": 198,
+   "skippers": 255
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1413,
+   "seeker_mean_wait_s": 294.2343005630143,
+   "all_mean_wait_s": 276.85585585585585,
+   "left_behind_events": 218,
+   "skippers": 319
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1250,
+   "seeker_mean_wait_s": 300.9861809045226,
+   "all_mean_wait_s": 280.67535723238905,
+   "left_behind_events": 361,
+   "skippers": 307
+  }
+ },
+ "bw-0.5_bs4.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1440,
+   "seeker_mean_wait_s": 274.7363834422658,
+   "all_mean_wait_s": 259.0959370904325,
+   "left_behind_events": 174,
+   "skippers": 306
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1439,
+   "seeker_mean_wait_s": 297.1290601992204,
+   "all_mean_wait_s": 272.7521235521236,
+   "left_behind_events": 131,
+   "skippers": 385
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1324,
+   "seeker_mean_wait_s": 325.8358458961474,
+   "all_mean_wait_s": 292.93732765104033,
+   "left_behind_events": 332,
+   "skippers": 390
+  }
+ },
+ "bw-0.7_bs0.5": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1307,
+   "seeker_mean_wait_s": 251.85359477124183,
+   "all_mean_wait_s": 254.53499344692005,
+   "left_behind_events": 292,
+   "skippers": 62
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1316,
+   "seeker_mean_wait_s": 267.18882633174536,
+   "all_mean_wait_s": 270.6921492921493,
+   "left_behind_events": 309,
+   "skippers": 111
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1221,
+   "seeker_mean_wait_s": 280.4690117252931,
+   "all_mean_wait_s": 274.0371020305841,
+   "left_behind_events": 440,
+   "skippers": 95
+  }
+ },
+ "bw-0.7_bs1.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1319,
+   "seeker_mean_wait_s": 252.99346405228758,
+   "all_mean_wait_s": 254.9499344692005,
+   "left_behind_events": 289,
+   "skippers": 70
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1301,
+   "seeker_mean_wait_s": 276.0030316154179,
+   "all_mean_wait_s": 276.7804375804376,
+   "left_behind_events": 338,
+   "skippers": 116
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1215,
+   "seeker_mean_wait_s": 281.9937185929648,
+   "all_mean_wait_s": 276.3010779644021,
+   "left_behind_events": 433,
+   "skippers": 105
+  }
+ },
+ "bw-0.7_bs2.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1365,
+   "seeker_mean_wait_s": 253.10936819172113,
+   "all_mean_wait_s": 254.98453473132372,
+   "left_behind_events": 277,
+   "skippers": 99
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1324,
+   "seeker_mean_wait_s": 275.1009094846254,
+   "all_mean_wait_s": 275.601287001287,
+   "left_behind_events": 306,
+   "skippers": 125
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1234,
+   "seeker_mean_wait_s": 283.8509212730318,
+   "all_mean_wait_s": 276.43720230634244,
+   "left_behind_events": 431,
+   "skippers": 132
+  }
+ },
+ "bw-0.7_bs3.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1379,
+   "seeker_mean_wait_s": 258.65664488017427,
+   "all_mean_wait_s": 257.7507208387942,
+   "left_behind_events": 273,
+   "skippers": 160
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1365,
+   "seeker_mean_wait_s": 274.1775660459073,
+   "all_mean_wait_s": 271.2525096525097,
+   "left_behind_events": 254,
+   "skippers": 198
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1275,
+   "seeker_mean_wait_s": 284.36683417085425,
+   "all_mean_wait_s": 274.6299824517423,
+   "left_behind_events": 405,
+   "skippers": 207
+  }
+ },
+ "bw-0.7_bs4.0": {
+  "B_real_1": {
+   "seekers": 2295,
+   "seekers_seated_at_board": 1443,
+   "seeker_mean_wait_s": 265.8161220043573,
+   "all_mean_wait_s": 261.1491480996068,
+   "left_behind_events": 248,
+   "skippers": 226
+  },
+  "B_real_2": {
+   "seekers": 2309,
+   "seekers_seated_at_board": 1426,
+   "seeker_mean_wait_s": 287.6444348202685,
+   "all_mean_wait_s": 276.31943371943373,
+   "left_behind_events": 212,
+   "skippers": 299
+  },
+  "B_real_3": {
+   "seekers": 2388,
+   "seekers_seated_at_board": 1245,
+   "seeker_mean_wait_s": 289.78015075376885,
+   "all_mean_wait_s": 273.6748558535974,
+   "left_behind_events": 353,
+   "skippers": 256
+  }
+ },
+ "demand120": {
+  "A_1": {
+   "seekers": 2817,
+   "seekers_seated_at_board": 1031,
+   "seeker_mean_wait_s": 321.8768193113241,
+   "all_mean_wait_s": 320.3957068516912,
+   "left_behind_events": 1188,
+   "skippers": 0
+  },
+  "A_2": {
+   "seekers": 2742,
+   "seekers_seated_at_board": 1033,
+   "seeker_mean_wait_s": 363.43690736688546,
+   "all_mean_wait_s": 360.72680189900734,
+   "left_behind_events": 1823,
+   "skippers": 0
+  },
+  "A_3": {
    "seekers": 2849,
    "seekers_seated_at_board": 1052,
+   "seeker_mean_wait_s": 358.8697788697789,
+   "all_mean_wait_s": 357.7087726697596,
+   "left_behind_events": 1805,
    "skippers": 0
   },
   "B_real_1": {
-   "all_mean_wait_s": 337.7307025151778,
-   "left_behind_events": 928,
-   "passengers": 4612,
-   "seeker_mean_wait_s": 362.19275825346114,
    "seekers": 2817,
-   "seekers_seated_at_board": 1082,
-   "skippers": 450
+   "seekers_seated_at_board": 1096,
+   "seeker_mean_wait_s": 350.44266950656726,
+   "all_mean_wait_s": 333.04531656548136,
+   "left_behind_events": 975,
+   "skippers": 341
   },
   "B_real_2": {
-   "all_mean_wait_s": 365.4635304272766,
-   "left_behind_events": 1493,
-   "passengers": 4634,
-   "seeker_mean_wait_s": 390.65353756382206,
    "seekers": 2742,
-   "seekers_seated_at_board": 1089,
-   "skippers": 434
+   "seekers_seated_at_board": 1090,
+   "seeker_mean_wait_s": 380.2684172137126,
+   "all_mean_wait_s": 359.8884333189469,
+   "left_behind_events": 1526,
+   "skippers": 330
   },
   "B_real_3": {
-   "all_mean_wait_s": 368.59911429776463,
-   "left_behind_events": 1534,
-   "passengers": 4742,
-   "seeker_mean_wait_s": 388.82098982098984,
    "seekers": 2849,
-   "seekers_seated_at_board": 1132,
-   "skippers": 416
+   "seekers_seated_at_board": 1084,
+   "seeker_mean_wait_s": 389.71639171639174,
+   "all_mean_wait_s": 368.4017292281738,
+   "left_behind_events": 1563,
+   "skippers": 346
   }
  },
  "demand80": {
   "A_1": {
-   "all_mean_wait_s": 230.22663627482905,
-   "left_behind_events": 35,
-   "passengers": 3071,
-   "seeker_mean_wait_s": 228.9204728640516,
    "seekers": 1861,
    "seekers_seated_at_board": 1449,
+   "seeker_mean_wait_s": 228.9204728640516,
+   "all_mean_wait_s": 230.22663627482905,
+   "left_behind_events": 35,
    "skippers": 0
   },
   "A_2": {
-   "all_mean_wait_s": 236.30846253229973,
-   "left_behind_events": 97,
-   "passengers": 3096,
-   "seeker_mean_wait_s": 239.77685950413223,
    "seekers": 1815,
    "seekers_seated_at_board": 1367,
+   "seeker_mean_wait_s": 239.77685950413223,
+   "all_mean_wait_s": 236.30846253229973,
+   "left_behind_events": 97,
    "skippers": 0
   },
   "A_3": {
-   "all_mean_wait_s": 229.3409236690186,
-   "left_behind_events": 57,
-   "passengers": 3118,
-   "seeker_mean_wait_s": 228.39104638619202,
    "seekers": 1854,
    "seekers_seated_at_board": 1415,
+   "seeker_mean_wait_s": 228.39104638619202,
+   "all_mean_wait_s": 229.3409236690186,
+   "left_behind_events": 57,
    "skippers": 0
   },
   "B_real_1": {
-   "all_mean_wait_s": 243.71898404428524,
-   "left_behind_events": 9,
-   "passengers": 3071,
-   "seeker_mean_wait_s": 256.8909188608275,
    "seekers": 1861,
-   "seekers_seated_at_board": 1669,
-   "skippers": 233
+   "seekers_seated_at_board": 1619,
+   "seeker_mean_wait_s": 251.37667920472865,
+   "all_mean_wait_s": 241.08140670791272,
+   "left_behind_events": 23,
+   "skippers": 192
   },
   "B_real_2": {
-   "all_mean_wait_s": 251.9234496124031,
-   "left_behind_events": 26,
-   "passengers": 3096,
-   "seeker_mean_wait_s": 274.44628099173553,
    "seekers": 1815,
-   "seekers_seated_at_board": 1554,
-   "skippers": 277
+   "seekers_seated_at_board": 1515,
+   "seeker_mean_wait_s": 265.69586776859506,
+   "all_mean_wait_s": 247.74257105943153,
+   "left_behind_events": 40,
+   "skippers": 203
   },
   "B_real_3": {
-   "all_mean_wait_s": 240.41372674791532,
-   "left_behind_events": 38,
-   "passengers": 3118,
-   "seeker_mean_wait_s": 255.14131607335491,
    "seekers": 1854,
-   "seekers_seated_at_board": 1628,
-   "skippers": 205
+   "seekers_seated_at_board": 1587,
+   "seeker_mean_wait_s": 249.22060409924487,
+   "all_mean_wait_s": 238.90795381654908,
+   "left_behind_events": 44,
+   "skippers": 157
   }
  },
- "main": {
-  "A_1": {
-   "all_mean_wait_s": 254.28230668414156,
-   "left_behind_events": 312,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 249.3825708061002,
-   "seekers": 2295,
-   "seekers_seated_at_board": 1282,
-   "skippers": 0
-  },
-  "A_2": {
-   "all_mean_wait_s": 273.78687258687256,
-   "left_behind_events": 364,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 268.0303161541793,
-   "seekers": 2309,
-   "seekers_seated_at_board": 1218,
-   "skippers": 0
-  },
-  "A_3": {
-   "all_mean_wait_s": 274.5131611932815,
-   "left_behind_events": 466,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 278.74832495812393,
-   "seekers": 2388,
-   "seekers_seated_at_board": 1125,
-   "skippers": 0
-  },
-  "A_4": {
-   "all_mean_wait_s": 250.1457404980341,
-   "left_behind_events": 177,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 248.72560975609755,
-   "seekers": 2296,
-   "seekers_seated_at_board": 1174,
-   "skippers": 0
-  },
-  "A_5": {
-   "all_mean_wait_s": 277.5591888466413,
-   "left_behind_events": 422,
-   "passengers": 3945,
-   "seeker_mean_wait_s": 273.47566182749785,
-   "seekers": 2342,
-   "seekers_seated_at_board": 1193,
-   "skippers": 0
-  },
-  "B_oracle_1": {
-   "all_mean_wait_s": 267.1326343381389,
-   "left_behind_events": 139,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 287.8989106753813,
-   "seekers": 2295,
-   "seekers_seated_at_board": 1493,
-   "skippers": 419
-  },
-  "B_oracle_2": {
-   "all_mean_wait_s": 286.421879021879,
-   "left_behind_events": 173,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 310.5478562148116,
-   "seekers": 2309,
-   "seekers_seated_at_board": 1450,
-   "skippers": 454
-  },
-  "B_oracle_3": {
-   "all_mean_wait_s": 294.00551516670845,
-   "left_behind_events": 304,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 321.46398659966496,
-   "seekers": 2388,
-   "seekers_seated_at_board": 1329,
-   "skippers": 479
-  },
-  "B_oracle_4": {
-   "all_mean_wait_s": 264.2440366972477,
-   "left_behind_events": 92,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 284.3632404181185,
-   "seekers": 2296,
-   "seekers_seated_at_board": 1424,
-   "skippers": 390
-  },
-  "B_oracle_5": {
-   "all_mean_wait_s": 286.2484157160963,
-   "left_behind_events": 212,
-   "passengers": 3945,
-   "seeker_mean_wait_s": 308.3620836891546,
-   "seekers": 2342,
-   "seekers_seated_at_board": 1333,
-   "skippers": 467
-  },
+ "noshelter": {
   "B_real_1": {
-   "all_mean_wait_s": 271.4173001310616,
-   "left_behind_events": 146,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 290.93899782135077,
    "seekers": 2295,
-   "seekers_seated_at_board": 1493,
-   "skippers": 421
+   "seekers_seated_at_board": 1445,
+   "seeker_mean_wait_s": 268.93899782135077,
+   "all_mean_wait_s": 260.36041939711663,
+   "left_behind_events": 196,
+   "skippers": 272
   },
   "B_real_2": {
-   "all_mean_wait_s": 289.14079794079794,
-   "left_behind_events": 196,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 311.40883499350366,
    "seekers": 2309,
-   "seekers_seated_at_board": 1453,
-   "skippers": 445
+   "seekers_seated_at_board": 1391,
+   "seeker_mean_wait_s": 289.827197921178,
+   "all_mean_wait_s": 280.77065637065635,
+   "left_behind_events": 254,
+   "skippers": 276
   },
   "B_real_3": {
-   "all_mean_wait_s": 296.7663574830785,
-   "left_behind_events": 316,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 325.77805695142376,
    "seekers": 2388,
-   "seekers_seated_at_board": 1335,
-   "skippers": 490
-  },
-  "B_real_4": {
-   "all_mean_wait_s": 274.3402359108781,
-   "left_behind_events": 119,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 298.63022648083626,
-   "seekers": 2296,
-   "seekers_seated_at_board": 1446,
-   "skippers": 462
-  },
-  "B_real_5": {
-   "all_mean_wait_s": 282.00912547528515,
-   "left_behind_events": 225,
-   "passengers": 3945,
-   "seeker_mean_wait_s": 302.1054654141759,
-   "seekers": 2342,
-   "seekers_seated_at_board": 1317,
-   "skippers": 437
+   "seekers_seated_at_board": 1271,
+   "seeker_mean_wait_s": 295.86934673366835,
+   "all_mean_wait_s": 278.56029079969915,
+   "left_behind_events": 342,
+   "skippers": 311
   }
  },
  "outage3x": {
   "A_1": {
-   "all_mean_wait_s": 254.28230668414156,
-   "left_behind_events": 312,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 249.3825708061002,
    "seekers": 2295,
    "seekers_seated_at_board": 1282,
+   "seeker_mean_wait_s": 249.3825708061002,
+   "all_mean_wait_s": 254.28230668414156,
+   "left_behind_events": 312,
    "skippers": 0
   },
   "A_2": {
-   "all_mean_wait_s": 273.78687258687256,
-   "left_behind_events": 364,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 268.0303161541793,
    "seekers": 2309,
    "seekers_seated_at_board": 1218,
+   "seeker_mean_wait_s": 268.0303161541793,
+   "all_mean_wait_s": 273.78687258687256,
+   "left_behind_events": 364,
    "skippers": 0
   },
   "A_3": {
-   "all_mean_wait_s": 274.5131611932815,
-   "left_behind_events": 466,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 278.74832495812393,
    "seekers": 2388,
    "seekers_seated_at_board": 1125,
+   "seeker_mean_wait_s": 278.74832495812393,
+   "all_mean_wait_s": 274.5131611932815,
+   "left_behind_events": 466,
    "skippers": 0
   },
   "B_real_1": {
-   "all_mean_wait_s": 266.5748361730013,
-   "left_behind_events": 136,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 286.44444444444446,
    "seekers": 2295,
-   "seekers_seated_at_board": 1494,
-   "skippers": 406
+   "seekers_seated_at_board": 1444,
+   "seeker_mean_wait_s": 274.4488017429194,
+   "all_mean_wait_s": 265.2684141546527,
+   "left_behind_events": 215,
+   "skippers": 292
   },
   "B_real_2": {
-   "all_mean_wait_s": 290.02265122265123,
-   "left_behind_events": 188,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 314.55825032481596,
    "seekers": 2309,
-   "seekers_seated_at_board": 1449,
-   "skippers": 481
+   "seekers_seated_at_board": 1429,
+   "seeker_mean_wait_s": 299.47856214811605,
+   "all_mean_wait_s": 280.91711711711713,
+   "left_behind_events": 185,
+   "skippers": 377
   },
   "B_real_3": {
-   "all_mean_wait_s": 290.7269992479318,
-   "left_behind_events": 272,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 320.07705192629817,
    "seekers": 2388,
-   "seekers_seated_at_board": 1320,
-   "skippers": 479
+   "seekers_seated_at_board": 1280,
+   "seeker_mean_wait_s": 309.8739530988275,
+   "all_mean_wait_s": 288.3349210328403,
+   "left_behind_events": 349,
+   "skippers": 356
   }
  },
  "seek40": {
   "A_1": {
-   "all_mean_wait_s": 254.28230668414156,
-   "left_behind_events": 312,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 244.41801685029165,
    "seekers": 1543,
    "seekers_seated_at_board": 855,
+   "seeker_mean_wait_s": 244.41801685029165,
+   "all_mean_wait_s": 254.28230668414156,
+   "left_behind_events": 312,
    "skippers": 0
   },
   "A_2": {
-   "all_mean_wait_s": 273.78687258687256,
-   "left_behind_events": 364,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 268.96526867627784,
    "seekers": 1526,
    "seekers_seated_at_board": 795,
+   "seeker_mean_wait_s": 268.96526867627784,
+   "all_mean_wait_s": 273.78687258687256,
+   "left_behind_events": 364,
    "skippers": 0
   },
   "A_3": {
-   "all_mean_wait_s": 274.5131611932815,
-   "left_behind_events": 466,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 279.91543209876545,
    "seekers": 1620,
    "seekers_seated_at_board": 750,
+   "seeker_mean_wait_s": 279.91543209876545,
+   "all_mean_wait_s": 274.5131611932815,
+   "left_behind_events": 466,
    "skippers": 0
   },
   "B_real_1": {
-   "all_mean_wait_s": 265.0925294888598,
-   "left_behind_events": 182,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 292.52754374594946,
    "seekers": 1543,
-   "seekers_seated_at_board": 1011,
-   "skippers": 323
+   "seekers_seated_at_board": 1017,
+   "seeker_mean_wait_s": 283.49837977965,
+   "all_mean_wait_s": 267.8424639580603,
+   "left_behind_events": 243,
+   "skippers": 251
   },
   "B_real_2": {
-   "all_mean_wait_s": 276.3786357786358,
-   "left_behind_events": 188,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 312.3315858453473,
    "seekers": 1526,
-   "seekers_seated_at_board": 955,
-   "skippers": 303
+   "seekers_seated_at_board": 1007,
+   "seeker_mean_wait_s": 310.2712975098296,
+   "all_mean_wait_s": 281.64478764478764,
+   "left_behind_events": 227,
+   "skippers": 287
   },
   "B_real_3": {
-   "all_mean_wait_s": 287.7618450739534,
-   "left_behind_events": 345,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 334.9993827160494,
    "seekers": 1620,
-   "seekers_seated_at_board": 931,
-   "skippers": 344
+   "seekers_seated_at_board": 918,
+   "seeker_mean_wait_s": 308.8037037037037,
+   "all_mean_wait_s": 274.8465780897468,
+   "left_behind_events": 352,
+   "skippers": 252
   }
  },
  "seek80": {
   "A_1": {
-   "all_mean_wait_s": 254.28230668414156,
-   "left_behind_events": 312,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 253.0541598694943,
    "seekers": 3065,
    "seekers_seated_at_board": 1696,
-   "skippers": 0
-  },
-  "A_2": {
-   "all_mean_wait_s": 273.78687258687256,
-   "left_behind_events": 364,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 272.77330779054915,
-   "seekers": 3132,
-   "seekers_seated_at_board": 1619,
-   "skippers": 0
-  },
-  "A_3": {
-   "all_mean_wait_s": 274.5131611932815,
-   "left_behind_events": 466,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 276.9475667189953,
-   "seekers": 3185,
-   "seekers_seated_at_board": 1498,
-   "skippers": 0
-  },
-  "B_real_1": {
-   "all_mean_wait_s": 277.65006553079945,
-   "left_behind_events": 128,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 288.95040783034256,
-   "seekers": 3065,
-   "seekers_seated_at_board": 1912,
-   "skippers": 546
-  },
-  "B_real_2": {
-   "all_mean_wait_s": 298.82265122265125,
-   "left_behind_events": 160,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 311.2953384418902,
-   "seekers": 3132,
-   "seekers_seated_at_board": 1918,
-   "skippers": 626
-  },
-  "B_real_3": {
-   "all_mean_wait_s": 299.6229631486588,
-   "left_behind_events": 261,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 313.9949764521193,
-   "seekers": 3185,
-   "seekers_seated_at_board": 1739,
-   "skippers": 607
-  }
- },
- "tolhalf": {
-  "A_1": {
+   "seeker_mean_wait_s": 253.0541598694943,
    "all_mean_wait_s": 254.28230668414156,
    "left_behind_events": 312,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 249.3825708061002,
-   "seekers": 2295,
-   "seekers_seated_at_board": 1282,
    "skippers": 0
   },
   "A_2": {
+   "seekers": 3132,
+   "seekers_seated_at_board": 1619,
+   "seeker_mean_wait_s": 272.77330779054915,
    "all_mean_wait_s": 273.78687258687256,
    "left_behind_events": 364,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 268.0303161541793,
-   "seekers": 2309,
-   "seekers_seated_at_board": 1218,
    "skippers": 0
   },
   "A_3": {
+   "seekers": 3185,
+   "seekers_seated_at_board": 1498,
+   "seeker_mean_wait_s": 276.9475667189953,
    "all_mean_wait_s": 274.5131611932815,
    "left_behind_events": 466,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 278.74832495812393,
-   "seekers": 2388,
-   "seekers_seated_at_board": 1125,
    "skippers": 0
   },
   "B_real_1": {
-   "all_mean_wait_s": 251.98768020969857,
-   "left_behind_events": 237,
-   "passengers": 3815,
-   "seeker_mean_wait_s": 253.2174291938998,
-   "seekers": 2295,
-   "seekers_seated_at_board": 1359,
-   "skippers": 134
+   "seekers": 3065,
+   "seekers_seated_at_board": 1957,
+   "seeker_mean_wait_s": 270.6665579119086,
+   "all_mean_wait_s": 264.5606815203146,
+   "left_behind_events": 187,
+   "skippers": 345
   },
   "B_real_2": {
-   "all_mean_wait_s": 273.67747747747745,
-   "left_behind_events": 283,
-   "passengers": 3885,
-   "seeker_mean_wait_s": 274.3737548722391,
-   "seekers": 2309,
-   "seekers_seated_at_board": 1323,
-   "skippers": 166
+   "seekers": 3132,
+   "seekers_seated_at_board": 1909,
+   "seeker_mean_wait_s": 299.20561941251594,
+   "all_mean_wait_s": 288.9925353925354,
+   "left_behind_events": 163,
+   "skippers": 490
   },
   "B_real_3": {
-   "all_mean_wait_s": 275.59062421659564,
-   "left_behind_events": 404,
-   "passengers": 3989,
-   "seeker_mean_wait_s": 285.40033500837524,
-   "seekers": 2388,
-   "seekers_seated_at_board": 1261,
-   "skippers": 171
+   "seekers": 3185,
+   "seekers_seated_at_board": 1697,
+   "seeker_mean_wait_s": 304.6012558869702,
+   "all_mean_wait_s": 292.9511155678115,
+   "left_behind_events": 322,
+   "skippers": 452
   }
  }
 }

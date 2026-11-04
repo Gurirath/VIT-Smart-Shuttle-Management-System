@@ -1,5 +1,6 @@
 cd "$(dirname "$0")"
-for s in 1 3 5; do for sc in A B_real B_oracle; do python3 run_sim.py $s $sc results >> log_a.txt 2>&1; done; done &
-for s in 2 4; do for sc in A B_real B_oracle; do python3 run_sim.py $s $sc results >> log_b.txt 2>&1; done; done &
-wait
-echo DONE >> log_a.txt
+python3 make_jobs.py > jobs.txt
+rm -f stops.add.xml bg_*.xml corr_*.rou.xml bus_*.rou.xml
+for s in 1 2 3 4 5; do python3 build_scenario.py $s > /dev/null; done
+xargs -P "${WORKERS:-2}" -L 1 sh -c 'env $0 "$@"' < jobs.txt >> log_runs.txt 2>&1
+echo DONE >> log_runs.txt

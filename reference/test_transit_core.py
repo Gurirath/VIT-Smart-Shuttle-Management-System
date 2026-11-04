@@ -214,3 +214,141 @@ def test_escalation_recipients():
     assert assess_event({})["recipient"] == "LOG_ONLY"
     assert assess_event({"gps_jump": True})["recipient"] == "CONTROL_ROOM"
     assert assess_event({"faulty_seats": 9})["recipient"] == "CONTROL_ROOM_AND_MAINTENANCE"
+
+
+from transit_core import (
+    FilterConfig, SeatSignalFilter, RawThreshold, ThermalConfig, DifferentialSeatClassifier,
+    differential_classify, SETTLING, THERMAL, BLIND, PROBE_FAULT,
+)
+
+
+def test_filter_config_validation():
+    with pytest.raises(ValueError):
+        FilterConfig(median_window=4).validate()
+    with pytest.raises(ValueError):
+        FilterConfig(ema_alpha=0).validate()
+    with pytest.raises(ValueError):
+        FilterConfig(enter_counts=1000, exit_counts=1200).validate()
+    assert abs(FilterConfig().ema_time_constant_s() - 0.3476) < 1e-3
+
+
+def test_median_rejects_single_pothole_spike():
+    f = SeatSignalFilter()
+    for _ in range(30):
+        f.update(100)
+    for v in [4095] + [100] * 30:
+        f.update(v)
+    assert f.loaded is False and f.transitions == 0
+
+
+def test_hysteresis_stops_chatter_near_threshold():
+    import random
+    rng = random.Random(7)
+    f, raw = SeatSignalFilter(), RawThreshold()
+    for _ in range(50):
+        f.update(0)
+        raw.update(0)
+    for _ in range(600):
+        v = 1350 + rng.gauss(0, 150)
+        f.update(v)
+        raw.update(v)
+    assert f.loaded is True
+    assert f.transitions == 1
+    assert raw.transitions > 50
+
+
+def test_real_sit_and_stand_detected_within_a_second():
+    f = SeatSignalFilter()
+    for _ in range(20):
+        f.update(50)
+    steps = 0
+    while not f.loaded:
+        f.update(2600)
+        steps += 1
+    assert steps <= 10
+    steps = 0
+    while f.loaded:
+        f.update(50)
+        steps += 1
+    assert steps <= 10 and f.transitions == 2
+
+
+def test_baseline_absorbs_slow_foam_offset():
+    f = SeatSignalFilter()
+    for _ in range(6000):
+        f.update(300)
+    assert 280 < f.baseline <= 300
+    for _ in range(30):
+        f.update(300 + 1150)
+    assert f.loaded is False
+    for _ in range(30):
+        f.update(300 + 1400)
+    assert f.loaded is True
+
+
+TC = ThermalConfig()
+
+
+def run_classifier(seat_series, cabin_c, dt=1.0):
+    c = DifferentialSeatClassifier()
+    out = None
+    for i, s in enumerate(seat_series):
+        out = c.update(i * dt, True, s, cabin_c)
+    return out
+
+
+def approach(start, target, tau, n):
+    return [target + (start - target) * math.exp(-i / tau) for i in range(n)]
+
+
+def test_blind_band_from_config():
+    lo, hi = TC.blind_band()
+    assert abs(lo - 32.035) < 0.01 and abs(hi - 37.965) < 0.01
+
+
+def test_person_in_cool_cabin_is_occupied():
+    assert run_classifier(approach(22.0, 33.5, 20, 300), 22.0) == (OCCUPIED, THERMAL)
+
+
+def test_person_in_hot_cabin_is_occupied():
+    assert run_classifier(approach(42.0, 35.3, 20, 300), 42.0) == (OCCUPIED, THERMAL)
+
+
+def test_settled_bag_in_hot_cabin_is_object():
+    assert run_classifier([40.0] * 300, 40.0) == (OBJECT, THERMAL)
+
+
+def test_settled_bag_in_mild_cabin_is_object():
+    assert run_classifier([30.2] * 300, 30.0) == (OBJECT, THERMAL)
+
+
+def test_sun_warmed_bag_is_object():
+    assert run_classifier(approach(46.0, 28.0, 400, 300), 28.0) == (OBJECT, THERMAL)
+
+
+def test_cool_bag_warming_in_hot_cabin_is_object():
+    assert run_classifier(approach(31.0, 40.0, 300, 400), 40.0) == (OBJECT, THERMAL)
+
+
+def test_bag_in_blind_band_is_flagged_not_hidden():
+    assert run_classifier([35.4] * 300, 35.0) == (OCCUPIED, BLIND)
+
+
+def test_settling_and_empty_and_probe_fault():
+    c = DifferentialSeatClassifier()
+    assert c.update(0, True, 30.0, 25.0) == (OCCUPIED, SETTLING)
+    assert c.update(1, False, 30.0, 25.0) == (EMPTY, None)
+    assert c.update(2, True, float("nan"), 25.0) == (OCCUPIED, PROBE_FAULT)
+    assert c.update(3, True, 36.0, float("nan")) == (OCCUPIED, PROBE_FAULT)
+    assert c.update(4, True, 30.0, None) == (OBJECT, PROBE_FAULT)
+
+
+def test_differential_rule_direct():
+    assert differential_classify(-5.0, -4.0, 35.0, 40.0, TC) == (OCCUPIED, THERMAL)
+    assert differential_classify(2.0, 6.0, 33.0, 31.0, TC) == (OBJECT, THERMAL)
+    assert differential_classify(0.4, 0.5, 31.4, 31.0, TC) == (OBJECT, THERMAL)
+
+
+def test_warm_bag_far_from_skin_contact_is_object():
+    assert run_classifier([28.0] * 300, 25.0) == (OBJECT, THERMAL)
+    assert abs(TC.expected_contact(25.0) - 33.5) < 1e-9

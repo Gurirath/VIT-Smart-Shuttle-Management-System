@@ -82,10 +82,14 @@ def write_buses(edges, seed, headway=360, jitter=60, first=300, last=3 * 3600 + 
 def build(seed):
     net = sumolib.net.readNet(NET)
     edges = corridor_edges(net)
-    stops = write_stops(edges)
-    bg = write_background(seed)
-    corr = write_corridor_flow(edges, seed)
-    bus = write_buses(edges, seed)
+    files = [os.path.join(HERE, n) for n in ("stops.add.xml", f"bg_{seed}.rou.xml", f"corr_{seed}.rou.xml", f"bus_{seed}.rou.xml")]
+    if all(os.path.exists(f) and os.path.getsize(f) > 0 for f in files):
+        stops, bg, corr, bus = files
+    else:
+        stops = write_stops(edges)
+        bg = write_background(seed)
+        corr = write_corridor_flow(edges, seed)
+        bus = write_buses(edges, seed)
     return {"net": NET, "stops": stops, "routes": [bg, corr, bus], "edges": [e.getID() for e in edges],
             "edge_x0": [e.getFromNode().getCoord()[0] for e in edges]}
 

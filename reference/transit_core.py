@@ -78,6 +78,151 @@ def free_seat_count(states):
     return sum(1 for s in states if s == EMPTY)
 
 
+@dataclass
+class FilterConfig:
+    sample_hz: float = 10.0
+    median_window: int = 5
+    ema_alpha: float = 0.25
+    enter_counts: int = 1200
+    exit_counts: int = 1000
+    baseline_rate: float = 0.002
+    baseline_cap: float = 400.0
+
+    def validate(self):
+        if self.median_window < 1 or self.median_window % 2 == 0:
+            raise ValueError("median_window must be a positive odd number")
+        if not 0 < self.ema_alpha <= 1:
+            raise ValueError("ema_alpha must lie in (0, 1]")
+        if self.exit_counts >= self.enter_counts:
+            raise ValueError("exit_counts must be below enter_counts")
+        return self
+
+    def ema_time_constant_s(self):
+        return -1.0 / (self.sample_hz * math.log(1.0 - self.ema_alpha)) if self.ema_alpha < 1 else 0.0
+
+
+class SeatSignalFilter:
+    def __init__(self, cfg=None):
+        self.cfg = (cfg or FilterConfig()).validate()
+        self.window = []
+        self.ema = None
+        self.baseline = 0.0
+        self.loaded = False
+        self.transitions = 0
+
+    def update(self, raw):
+        self.window.append(raw)
+        if len(self.window) > self.cfg.median_window:
+            self.window.pop(0)
+        med = sorted(self.window)[len(self.window) // 2]
+        a = self.cfg.ema_alpha
+        self.ema = float(med) if self.ema is None else a * med + (1 - a) * self.ema
+        net = self.ema - self.baseline
+        before = self.loaded
+        if not self.loaded and net >= self.cfg.enter_counts:
+            self.loaded = True
+        elif self.loaded and net < self.cfg.exit_counts:
+            self.loaded = False
+        if self.loaded != before:
+            self.transitions += 1
+        if not self.loaded:
+            self.baseline += self.cfg.baseline_rate * (self.ema - self.baseline)
+            self.baseline = min(max(self.baseline, 0.0), self.cfg.baseline_cap)
+        return self.loaded
+
+
+class RawThreshold:
+    def __init__(self, threshold=1200):
+        self.threshold = threshold
+        self.loaded = False
+        self.transitions = 0
+
+    def update(self, raw):
+        now = raw >= self.threshold
+        if now != self.loaded:
+            self.transitions += 1
+        self.loaded = now
+        return now
+
+
+@dataclass
+class ThermalConfig:
+    eps_thermal_c: float = 1.5
+    contact_min_c: float = 29.0
+    contact_max_c: float = 38.5
+    contact_nominal_c: float = 35.0
+    skin_pull: float = 0.15
+    contact_tol_c: float = 2.0
+    blind_margin_c: float = 1.2
+    settle_s: float = 60.0
+    window_s: float = 300.0
+    decay_tol_c: float = 0.8
+    smooth_n: int = 5
+    probe_min_c: float = -10.0
+    probe_max_c: float = 85.0
+
+    def expected_contact(self, cabin_c):
+        return self.contact_nominal_c + self.skin_pull * (cabin_c - self.contact_nominal_c)
+
+    def blind_band(self):
+        half = self.eps_thermal_c / (1.0 - self.skin_pull) + self.blind_margin_c
+        return self.contact_nominal_c - half, self.contact_nominal_c + half
+
+
+SETTLING = "settling"
+THERMAL = "thermal"
+BLIND = "blind"
+PROBE_FAULT = "probe_fault"
+
+
+def differential_classify(delta_now, delta_then, seat_c, cabin_c, cfg):
+    lo, hi = cfg.blind_band()
+    if seat_c > cfg.contact_max_c or seat_c < cfg.contact_min_c:
+        return OBJECT, THERMAL
+    a, b = abs(delta_now), abs(delta_then)
+    if a >= cfg.eps_thermal_c:
+        if abs(seat_c - cfg.expected_contact(cabin_c)) > cfg.contact_tol_c:
+            return OBJECT, THERMAL
+        if a < b - cfg.decay_tol_c:
+            return OBJECT, THERMAL
+        return OCCUPIED, THERMAL
+    if lo <= cabin_c <= hi:
+        return OCCUPIED, BLIND
+    return OBJECT, THERMAL
+
+
+class DifferentialSeatClassifier:
+    def __init__(self, cfg=None, fallback=None):
+        self.cfg = cfg or ThermalConfig()
+        self.fallback = fallback or SeatConfig().validate()
+        self.loaded_since = None
+        self.history = []
+
+    def _probe_ok(self, value):
+        return value is not None and not math.isnan(value) and self.cfg.probe_min_c <= value <= self.cfg.probe_max_c
+
+    def update(self, t_s, loaded, seat_c, cabin_c):
+        if not loaded:
+            self.loaded_since = None
+            self.history = []
+            return EMPTY, None
+        if self.loaded_since is None:
+            self.loaded_since = t_s
+        if not self._probe_ok(seat_c):
+            return OCCUPIED, PROBE_FAULT
+        if not self._probe_ok(cabin_c):
+            return classify_seat(self.fallback.pressure_threshold, seat_c, self.fallback), PROBE_FAULT
+        self.history.append((t_s, seat_c - cabin_c, seat_c, cabin_c))
+        while self.history and self.history[0][0] < t_s - self.cfg.window_s:
+            self.history.pop(0)
+        if t_s - self.loaded_since < self.cfg.settle_s:
+            return OCCUPIED, SETTLING
+        n = self.cfg.smooth_n
+        recent, first = self.history[-n:], self.history[:n]
+        mean = lambda rows, k: sum(r[k] for r in rows) / len(rows)
+        return differential_classify(mean(recent, 1), mean(first, 1), mean(recent, 2), mean(recent, 3), self.cfg)
+
+
 def parse_nmea_rmc(sentence):
     body = sentence.strip()
     if not body.startswith("$") or "*" not in body:
