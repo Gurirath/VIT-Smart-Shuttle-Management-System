@@ -124,6 +124,14 @@ python vit_smart_shuttle_gui.py
 | Stop board | next 4 buses, rebuilt every 10 s, rows older than 60 s marked approximate |
 | Institutional fare | max(₹2, distance_km × ₹5) |
 
+## Changes in version 1.1 (journal revision)
+
+1. Pressure channel sampled at 10 Hz and filtered (median of 5, EMA α = 0.25, hysteresis 1,200 / 1,000 counts, slow baseline tracker) in the firmware and the reference module.
+2. Second DS18B20 in the cabin air; seats are classified from ΔT = T_seat − T_cabin with a skin-contact check and a 300 s decay check. Seats in the blind band (cabin about 32 to 38 °C) are flagged BLIND. The fixed 34 to 42 °C band is kept only as the fallback when the cabin probe fails, in the firmware, the back end (`/sensor` endpoint takes an optional `cabin_temperature`) and the dashboard text.
+3. Rider choice in the simulation is a binary logit model, used as a sensitivity baseline, with a 5 × 5 coefficient grid and six variants.
+4. New physical sensor and road-vibration model (`simulation/sensor_filter_study.py`, Figs. 5 and 6) and the bench and ride test kit in `hardware_tests/`.
+5. Architecture, pipeline and data-path diagrams updated for the filter and the cabin probe; all simulation figures regenerated.
+
 ## Citation
 
 If you use this code, please cite the paper (see `CITATION.cff`).

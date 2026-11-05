@@ -388,9 +388,10 @@ const SeatAllocation: React.FC = () => {
                   <div>
                     <h4 className="font-semibold text-amber-900">Non-human object detected - not a student</h4>
                     <p className="text-sm text-amber-700 mt-1">
-                      The pressure sensor is triggered, but the surface temperature is outside the human
-                      band (34.0-42.0&nbsp;&deg;C). This indicates a non-human object such as a bag or parcel
-                      occupying the seat.
+                      The pressure sensor is triggered, but the seat temperature does not match a person
+                      when compared with the cabin probe (it is outside the skin-contact range, or the seat-to-cabin
+                      difference is fading). This indicates a non-human object such as a bag or parcel occupying the
+                      seat. Without a cabin reading the fixed 34.0-42.0&nbsp;&deg;C band is used instead.
                     </p>
                   </div>
                 </div>

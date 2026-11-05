@@ -66,6 +66,7 @@ class SensorRequest(BaseModel):
     shuttle_id: str
     pressure: str  # HIGH / LOW
     temperature: float
+    cabin_temperature: Optional[float] = None
 
 class SensorResponse(BaseModel):
     seat_number: int

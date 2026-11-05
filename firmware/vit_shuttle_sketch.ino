@@ -7,7 +7,7 @@
 // ============================================================
 //              VIT SMART SHUTTLE SYSTEM
 //                 WOKWI ESP32 SIMULATION
-//                  (Revision 2 — see change log)
+//                  (Revision 3 — see change log)
 // ============================================================
 //
 // CHANGE LOG (this revision vs. previous version):
@@ -27,6 +27,14 @@
 //     are now only accepted when the vehicle is stationary AND the
 //     door is open, to avoid an accidental scan while the shuttle
 //     is moving or the door is shut.
+//  4. Revision 3: the pressure channel is sampled at 10 Hz and
+//     filtered (median of 5, EMA alpha 0.25, enter 1200 / exit 1000
+//     counts, slow baseline tracker). A second DS18B20 on the same
+//     bus reads cabin air, and the seat is classified from the
+//     seat-to-cabin difference (Section 3.15.1 of the paper). Seats
+//     in the blind band (cabin about 32-38 C) are flagged BLIND. The
+//     34-42 C band of item 2 is now only the fallback when the cabin
+//     probe is missing (flag PROBE_FAULT).
 //
 // ============================================================
 
@@ -65,7 +73,7 @@ const unsigned long TEMP_INTERVAL = 1000;
 
 const int PRESSURE_THRESHOLD = 1200;
 
-// ---- Human temperature band (see change-log item 2) ----
+// ---- Fallback human temperature band (change-log items 2 and 4) ----
 // Reference points used to size this band (cite these in the
 // disclosure write-up, not just here):
 //   Normal body temperature   : 36.1 C - 37.2 C

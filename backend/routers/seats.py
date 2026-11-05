@@ -3,25 +3,36 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 from schemas import SeatResponse, SensorRequest, SensorResponse
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 
 router = APIRouter(tags=["seats"])
 
-def classify_seat(pressure: str, temperature: float) -> str:
-    # Human-occupant temperature band: 34.0-42.0 C (matches the Wokwi sketch and
-    # the Python GUI). Rationale for the wide upper bound: a standard fever starts
-    # at 38.0 C, a high fever spans 39.4-41.0 C, and hyperpyrexia (>41.5 C) is a
-    # medical emergency - every one of these is still a *human* occupant, so a
-    # feverish passenger must classify as OCCUPIED, never as a non-human OBJECT.
-    # The low bound (34.0 C) allows for a cold surface probe / mild hypothermia
-    # while still excluding an ambient-temperature bag or parcel.
+FALLBACK_BAND = (34.0, 42.0)
+EPS_THERMAL = 1.5
+CONTACT_RANGE = (29.0, 38.5)
+CONTACT_TOL = 2.0
+SKIN_PULL = 0.15
+BLIND_MARGIN = 1.2
+
+
+def expected_contact(cabin: float) -> float:
+    return 35.0 + SKIN_PULL * (cabin - 35.0)
+
+
+def classify_seat(pressure: str, temperature: float, cabin: Optional[float] = None) -> str:
     if pressure == "LOW":
         return "AVAILABLE"
-    elif 34.0 <= temperature <= 42.0:
-        return "OCCUPIED"
-    else:
+    if cabin is None:
+        return "OCCUPIED" if FALLBACK_BAND[0] <= temperature <= FALLBACK_BAND[1] else "OBJECT"
+    if not CONTACT_RANGE[0] <= temperature <= CONTACT_RANGE[1]:
         return "OBJECT"
+    tc = expected_contact(cabin)
+    delta = abs(temperature - cabin)
+    if delta >= EPS_THERMAL:
+        return "OCCUPIED" if abs(temperature - tc) <= CONTACT_TOL else "OBJECT"
+    half = EPS_THERMAL / (1 - SKIN_PULL) + BLIND_MARGIN
+    return "OCCUPIED" if abs(cabin - tc) <= half else "OBJECT"
 
 def seat_to_response(seat: models.Seat) -> SeatResponse:
     status = seat.status
@@ -65,7 +76,7 @@ def update_sensor(shuttle_id: str, seat_number: int, data: SensorRequest, db: Se
     if not seat:
         raise HTTPException(status_code=404, detail="Seat not found")
     
-    new_status = classify_seat(data.pressure, data.temperature)
+    new_status = classify_seat(data.pressure, data.temperature, data.cabin_temperature)
     seat.status = new_status
     seat.temperature = data.temperature
     seat.pressure = data.pressure
