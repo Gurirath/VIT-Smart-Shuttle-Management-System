@@ -1,0 +1,26 @@
+{
+ "bus_full": {
+  "attempts": 70,
+  "accepted": 69,
+  "count_label": "69 / 69",
+  "free_seats_label": "0",
+  "denied_lines": [
+   "[ENTRY DENIED] BUS FULL (44 SEATED + 25 STANDING)"
+  ],
+  "pass": true
+ },
+ "idle": {
+  "route": "0%",
+  "seat": "EMPTY",
+  "riders": "0 / 69",
+  "free": "44",
+  "pass": true
+ },
+ "rapid": {
+  "cycles": 15,
+  "total_s": 0.004092485000001034,
+  "per_cycle_ms": 0.27283233333340223,
+  "riders_after": 0,
+  "pass": true
+ }
+}

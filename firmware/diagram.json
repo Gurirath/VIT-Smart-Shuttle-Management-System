@@ -68,7 +68,7 @@
       "left": 650,
       "attrs": {
         "temperature": "36.7",
-        "label": "SEAT PROBE"
+        "label": "SEAT PROBE (ZONE 1)"
       }
     },
     {
@@ -88,6 +88,15 @@
       "attrs": {
         "temperature": "30.0",
         "label": "CABIN PROBE"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 230,
+      "left": 760,
+      "attrs": {
+        "value": "4700"
       }
     }
   ],
@@ -214,7 +223,7 @@
     ],
     [
       "temp2:DQ",
-      "esp:D18",
+      "esp:D23",
       "blue",
       []
     ],
@@ -222,6 +231,18 @@
       "temp2:GND",
       "esp:GND.5",
       "black",
+      []
+    ],
+    [
+      "temp2:DQ",
+      "r2:1",
+      "blue",
+      []
+    ],
+    [
+      "r2:2",
+      "esp:3V3",
+      "red",
       []
     ]
   ],

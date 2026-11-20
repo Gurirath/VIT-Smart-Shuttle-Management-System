@@ -9,7 +9,9 @@ STATIONARY_EPSILON = 15
 LONG_PRESS_TIME_MS = 1500
 FARE_PER_KM = 5.0
 MINIMUM_FARE = 2.0
-MAX_PASSENGERS = 30
+SEAT_CAPACITY = 44
+STANDING_CAPACITY = 25
+MAX_PASSENGERS = SEAT_CAPACITY + STANDING_CAPACITY
 
 START_LAT, START_LNG = 12.9692, 79.1559
 END_LAT, END_LNG = 12.9725, 79.1630
@@ -19,7 +21,7 @@ def classify_seat(pressure, temperature):
     if pressure < PRESSURE_THRESHOLD:
         return "EMPTY"
     if HUMAN_TEMP_MIN <= temperature <= HUMAN_TEMP_MAX:
-        return "STUDENT"
+        return "OCCUPIED"
     return "OBJECT"
 
 

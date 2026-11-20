@@ -31,18 +31,18 @@ for x, h in zip(cols, ["Route", "Bus", "Arrives in", "Seats"]):
 y = 5.8
 for row in rows:
     ax.text(cols[0], y, row["route"], color=W, fontsize=15, weight="bold", va="center")
-    ax.text(cols[1], y, "Bus " + str(int(row["bus"][3:])), color=W, fontsize=13, va="center")
+    ax.text(cols[1], y, "Bus " + str(int(row["bus"].split("_")[-1][-3:] if "_" in row["bus"] else row["bus"][3:])), color=W, fontsize=13, va="center")
     eta = "Due" if row["eta_min"] == 0 else f"{row['eta_min']} min"
     ax.text(cols[2], y, eta, color=W, fontsize=15, weight="bold", va="center")
     lab = row["label"]
-    seats = f"{row['free_seats']} free" if row["free_seats"] > 0 else "Full"
+    seats = f"{row['free_seats']} free" if row["free_seats"] > 0 else "0 seats"
     ax.text(cols[3], y, seats, color=W, fontsize=15, weight="bold", va="center")
-    ax.text(cols[3] + 2.4, y, lab.title(), color=Y, fontsize=11, va="center")
+    ax.text(cols[3] + 2.4, y, "Standing only" if row["free_seats"] <= 0 else lab.title(), color=Y, fontsize=11, va="center")
     if row["approximate"]:
         ax.text(14.9, y, "~", color=Y, fontsize=14, va="center")
     ax.plot([0.9, 15.1], [y - 0.62, y - 0.62], color="#2c2c2c", lw=1)
-    y -= 1.35
-ax.text(0.9, 1.15, "Seat counts come from seat sensors on each bus. Standing room is not shown.", color=Y, fontsize=8.5, va="center")
-ax.text(0.9, 0.82, "Rows marked ~ use bus data older than 60 s.", color=Y, fontsize=8.5, va="center")
+    y -= 1.22
+ax.text(0.9, 1.12, "Seat counts come from seat sensors on each bus. \"0 seats\": no free seat, standing room may remain.", color=Y, fontsize=7.8, va="center")
+ax.text(0.9, 0.82, "Rows marked ~ use bus data older than 60 s.", color=Y, fontsize=7.8, va="center")
 fig.savefig(os.path.join(FIG, "fig_display.png"), dpi=220)
 print(rows)

@@ -7,7 +7,7 @@ from schemas import TripEntryRequest, TripExitRequest
 from routers.trips import trip_entry, trip_exit
 from routers.shuttles import compute_route_progress
 
-SEAT_STATE_TO_STATUS = {"EMPTY": "AVAILABLE", "OBJECT": "OBJECT", "STUDENT": "OCCUPIED"}
+SEAT_STATE_TO_STATUS = {"EMPTY": "AVAILABLE", "OBJECT": "OBJECT", "OCCUPIED": "OCCUPIED", "STUDENT": "OCCUPIED"}
 SEAT_PRESSURE_THRESHOLD = 1200  # matches PRESSURE_THRESHOLD in the ESP32 sketch
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.hivemq.com")
@@ -80,7 +80,7 @@ def process_gps(db, payload):
     print("[MQTT] GPS updated\nShuttle: VIT-SHUTTLE-01")
 
 def process_seat(db, payload):
-    # Sketch payload: "STATE,TEMP=36.7,PRESSURE=1250[,CABIN=31.2,FLAG=THERMAL]" where STATE is EMPTY/OBJECT/STUDENT
+    # Sketch payload: "STATE,TEMP=36.7,PRESSURE=1250[,CABIN=31.2,FLAG=THERMAL]" where STATE is EMPTY/OBJECT/OCCUPIED (STUDENT accepted from older sketches)
     # (the ESP32 already classifies the seat itself; we don't re-derive it here).
     parts = payload.split(',')
     if len(parts) < 3:
@@ -120,12 +120,12 @@ def process_seat(db, payload):
 
     if new_status == "OCCUPIED":
         # The sketch's seat sensor fires before the face-scan button (checkSeat()
-        # runs before checkButton() every loop), so a sensor-only "STUDENT" reading
+        # runs before checkButton() every loop), so a sensor-only "OCCUPIED" reading
         # must not claim the seat itself - that would make the follow-up ENTRY
         # billing event get rejected as "seat already occupied" by trip_entry().
         # Leave status alone; trip_entry() is what legitimately claims the seat.
         db.commit()
-        print("[MQTT] Seat 1 sensor: STUDENT detected, awaiting face scan")
+        print("[MQTT] Seat 1 sensor: OCCUPIED detected, awaiting face scan")
         return
 
     seat.status = new_status

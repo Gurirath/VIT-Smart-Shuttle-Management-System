@@ -9,7 +9,10 @@ VARIANTS = {
     "demand120": "DEMAND_SCALE=1.2",
     "outage3x": "OUTAGE_EVERY_S=600",
     "noshelter": "SHELTER_SHARE=0.0",
+    "smstimer": "SMS_MODE=timer",
+    "debounce": "FILTER_MODE=debounce",
 }
+B_ONLY = {"noshelter", "smstimer", "debounce"}
 
 jobs = []
 for s in SEEDS_MAIN:
@@ -25,7 +28,7 @@ for bw in BETA_WAIT:
 for name, env in VARIANTS.items():
     for s in SEEDS_SENS:
         for sc in ("A", "B_real"):
-            if name == "noshelter" and sc == "A":
+            if name in B_ONLY and sc == "A":
                 continue
             jobs.append(f"{env} python3 run_sim.py {s} {sc} results_sens/{name}")
 print("\n".join(jobs))

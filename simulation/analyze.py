@@ -45,15 +45,40 @@ def main():
 
     arr = [a for r in allruns for a in r["arrivals"]]
     M["arrivals_n"] = len(arr)
-    loads_by_stop = defaultdict(list)
-    for r in A:
-        for a in r["arrivals"]:
-            loads_by_stop[a["stop"]].append(a["load"])
-    M["load_by_stop_mean"] = [float(np.mean(loads_by_stop[s])) for s in range(20)]
-    M["load_by_stop_p90"] = [float(np.percentile(loads_by_stop[s], 90)) for s in range(20)]
+    lines = A[0]["lines"]
+    M["lines"] = {k: {"stops": len(v["stops"]), "length_km": v["length_m"] / 1000.0} for k, v in lines.items()}
+    M["arrivals_by_route"] = {k: sum(1 for a in arr if a["route"] == k) for k in lines}
+    prof = {}
+    for rt, d in lines.items():
+        lb = defaultdict(list)
+        for r in A:
+            for a in r["arrivals"]:
+                if a["route"] == rt:
+                    lb[a["stop"]].append(a["load"])
+        prof[rt] = {"stops": d["stops"], "mean": [float(np.mean(lb[s])) for s in d["stops"]],
+                    "p90": [float(np.percentile(lb[s], 90)) for s in d["stops"]]}
+    M["load_profile"] = prof
+    M["load_by_stop_mean"] = prof["21"]["mean"]
+    M["load_by_stop_p90"] = prof["21"]["p90"]
     M["share_arrivals_no_free_seat"] = float(np.mean([a["gt_free"] == 0 for r in A for a in r["arrivals"]]))
+    shared = [g for g in lines["21"]["stops"] if g in lines["22"]["stops"]]
+    cvs, bunch = [], []
+    for r in A:
+        for g in shared:
+            ts = sorted(a["t"] for a in r["arrivals"] if a["stop"] == g)
+            h = np.diff(ts)
+            if len(h) > 3:
+                cvs.append(float(np.std(h) / np.mean(h)))
+                bunch.append(float(np.mean(h < 60)))
+    M["shared_headway"] = {"cv_mean": float(np.mean(cvs)), "share_under_60s": float(np.mean(bunch)),
+                           "combined_scheduled_buses_per_hour": 3600 / 360 + 3600 / 600}
 
     seat = {}
+    seat["by_route"] = {}
+    for rt in lines:
+        sub = [(a["gt_free"], a["shown_fallback"]) for a in arr if a["route"] == rt and a["shown_fallback"] is not None]
+        e2 = np.array([s - g for g, s in sub])
+        seat["by_route"][rt] = {"n": len(sub), "exact": float((e2 == 0).mean()), "within1": float((np.abs(e2) <= 1).mean())}
     for c in ("fallback", "primary_only", "oracle"):
         pairs = [(a["gt_free"], a[f"shown_{c}"]) for a in arr]
         miss = sum(1 for g, s in pairs if s is None)
@@ -160,25 +185,32 @@ def main():
                          "mean_primary_bytes": sum(m["bytes_primary"] for m in msgs) / max(1, sum(m["primary"] for m in msgs))}
     M["wall_s_mean"] = float(np.mean([r["wall_s"] for r in allruns]))
     json.dump(M, open(os.path.join(RES, "metrics.json"), "w"), indent=1)
-    figures(M, A, BR, BO, allruns)
+    figures(M, A, BR, BO, allruns, lines)
     return M
 
 
-def figures(M, A, BR, BO, allruns):
-    x = np.arange(1, 21)
-    fig, ax = plt.subplots(figsize=(6.4, 3.0))
-    ax.plot(x, M["load_by_stop_mean"], color=S1, lw=2, marker="o", ms=4, label="Mean on-board load")
-    ax.plot(x, M["load_by_stop_p90"], color=S2, lw=2, marker="s", ms=4, label="90th percentile")
-    ax.axhline(44, color=INK2, lw=1.2, ls="--")
-    ax.text(20.3, 44, "44 seats", va="center", color=INK2, fontsize=9)
-    ax.axhline(69, color=INK2, lw=1.0, ls=":")
-    ax.text(20.3, 69, "44 + 25 standing", va="center", color=INK2, fontsize=9)
-    ax.set_xlabel("Stop on corridor (bus arriving, before alighting)")
-    ax.set_ylabel("Passengers on board")
-    ax.set_xticks(x)
-    ax.set_xlim(0.5, 20.5)
-    ax.set_ylim(0, 80)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.22), ncol=2)
+def figures(M, A, BR, BO, allruns, lines):
+    names = A[0]["stop_names"]
+    fig, axs = plt.subplots(1, 2, figsize=(6.8, 3.0), sharey=True, gridspec_kw={"width_ratios": [20, 14]})
+    for ax, rt in zip(axs, ("21", "22")):
+        pr = M["load_profile"][rt]
+        x = np.arange(1, len(pr["stops"]) + 1)
+        ax.plot(x, pr["mean"], color=S1, lw=2, marker="o", ms=3.5, label="Mean on-board load")
+        ax.plot(x, pr["p90"], color=S2, lw=2, marker="s", ms=3.5, label="90th percentile")
+        ax.axhline(44, color=INK2, lw=1.2, ls="--")
+        ax.axhline(69, color=INK2, lw=1.0, ls=":")
+        sh = [i + 1 for i, g in enumerate(pr["stops"]) if g in lines["21"]["stops"] and g in lines["22"]["stops"]]
+        ax.axvspan(min(sh) - 0.5, max(sh) + 0.5, color="#ededed", lw=0, zorder=0)
+        ax.set_xticks(x)
+        ax.set_xticklabels([names[g] for g in pr["stops"]], rotation=90, fontsize=7)
+        ax.set_title(f"Route {rt}", fontsize=10)
+        ax.set_ylim(0, 80)
+    axs[1].text(len(M["load_profile"]["22"]["stops"]) + 0.8, 44, "44 seats", va="center", color=INK2, fontsize=8)
+    axs[1].text(len(M["load_profile"]["22"]["stops"]) + 0.8, 69, "+ 25 standing", va="center", color=INK2, fontsize=8)
+    axs[0].set_ylabel("Passengers on board")
+    fig.text(0.5, -0.07, "Stop (bus arriving, before alighting); shaded: stops shared by both routes", ha="center", fontsize=9)
+    h, l = axs[0].get_legend_handles_labels()
+    fig.legend(h, l, loc="lower center", bbox_to_anchor=(0.5, -0.2), ncol=2)
     fig.savefig(os.path.join(FIG, "fig_load_profile.png"))
     plt.close(fig)
 

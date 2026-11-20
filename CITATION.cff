@@ -6,8 +6,8 @@ authors:
     given-names: Gurirath Singh
     affiliation: "Vellore Institute of Technology, Vellore, India"
     email: gurirathkhurana@gmail.com
-version: 1.1.0
-date-released: 2026-11-05
+version: 1.2.0
+date-released: 2026-11-20
 license: MIT
 repository-code: "https://github.com/Gurirath/VIT-Smart-Shuttle-Management-System"
 keywords:

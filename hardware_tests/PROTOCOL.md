@@ -110,3 +110,13 @@ Write `notes.txt` with:
 4. The setup in the car for Tests 5 and 6
 
 Send all CSVs, `notes.txt` and photos here. I will turn them into the calibration curve, hysteresis and creep numbers, the noise-attenuation plot and the hot-cabin thermal plot for the paper.
+
+## Test 7: timing and TLS on the ESP32
+
+Flash `esp32_timing/esp32_timing.ino` after setting `WIFI_SSID` and `WIFI_PASS`. It needs only the ESP32 and Wi-Fi. The serial monitor (115200 baud) prints:
+
+1. `classify_us_per_call` and `filter_us_per_sample`: time per call of the differential thermal rule and of one 10 Hz filter step, averaged over 10,000 calls.
+2. `tls_connect_ms`, `heap_drop_bytes` and `min_free_heap`: time and heap used by a TLS connection to an MQTT broker on port 8883.
+3. `publish_call_us` and `broker_round_trip_ms`: time spent inside `publish()` and the round trip of a 200-byte seat summary echoed back by the broker, over 100 publishes.
+
+Copy the serial output into `logs/test7_timing.txt`. These numbers replace the "not measured" entries in Section 4.5 and Table 24 of the paper.

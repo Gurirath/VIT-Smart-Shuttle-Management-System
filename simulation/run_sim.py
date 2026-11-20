@@ -14,10 +14,10 @@ sys.path.insert(0, os.path.join(HERE, "..", "reference"))
 import libsumo as traci
 import sumo
 
-from build_scenario import build, SIM_END, STOP_POS, STOP_LEN
+from build_scenario import build, SIM_END, STOP_POS, STOP_LEN, SHARED
 from transit_core import (
     SeatConfig, configure_for_environment, EMPTY, OBJECT, OCCUPIED, build_seat_summary, encode,
-    ThermalConfig, differential_classify,
+    ThermalConfig, differential_classify, FilterConfig,
     build_sms_summary, build_nmea_rmc, parse_nmea_rmc, build_stop_board, IdentityMode, verify_rider,
     fare_record, slab_policy, stage_policy, per_km_policy, flat_policy,
 )
@@ -40,7 +40,17 @@ KAPPA_EXPOSURE = float(os.environ.get("KAPPA_EXPOSURE", "0.5"))
 SHELTER_SHARE = float(os.environ.get("SHELTER_SHARE", "0.5"))
 DWELL_BASE, DWELL_BOARD, DWELL_ALIGHT = 10.0, 2.0, 1.5
 PUBLISH_EVERY = 10
+SMS_MODE = os.environ.get("SMS_MODE", "event")
 SMS_EVERY = 30
+SMS_DELTA = 2
+SMS_KEEPALIVE = 300
+FILTER_MODE = os.environ.get("FILTER_MODE", "filtered")
+FCFG = FilterConfig().validate()
+SUBSAMPLES = int(FCFG.sample_hz)
+SHOCKS_PER_S = 2.0 / 60.0
+VIB_RMS = 0.7
+BRANCH_RATE_PER_MIN = 1.0
+BRANCH_DEST_SHARE = 0.15
 BOARD_EVERY = 10
 DISPLAY_LAG = 1
 WEAK_EDGES = {6}
@@ -71,10 +81,12 @@ def to_latlon(x, y):
 
 class Passenger:
     __slots__ = ("pid", "origin", "dest", "t_arrive", "wants_seat", "t_board", "seated_at_board",
-                 "seat_time", "stand_time", "skips", "t_first_skip", "bus", "credential", "female_free")
+                 "seat_time", "stand_time", "skips", "t_first_skip", "bus", "credential", "female_free", "routes", "route")
 
-    def __init__(self, pid, origin, dest, t, rng):
+    def __init__(self, pid, origin, dest, t, rng, routes=("21",)):
         self.pid = pid
+        self.routes = routes
+        self.route = None
         self.origin = origin
         self.dest = dest
         self.t_arrive = t
@@ -93,8 +105,23 @@ class Passenger:
 
 
 class Bus:
-    def __init__(self, vid, rng):
+    def __init__(self, vid, rng, route="21"):
         self.vid = vid
+        self.route = route
+        self.k = -1
+        self.dnext = 0.0
+        self.win = np.full((FCFG.median_window, SEATS), 300.0)
+        self.widx = 0
+        self.ema = np.full(SEATS, 300.0)
+        self.base = np.zeros(SEATS)
+        self.loaded = np.zeros(SEATS, dtype=bool)
+        self.lvl = np.full(SEATS, 2600.0)
+        self.db_state = np.zeros(SEATS, dtype=bool)
+        self.db_cand = np.zeros(SEATS, dtype=bool)
+        self.db_count = np.zeros(SEATS, dtype=int)
+        self.th_state = [OCCUPIED] * SEATS
+        self.last_sms_free = None
+        self.sms_door_due = False
         self.seat_occ = [None] * SEATS
         self.seat_obj = [None] * SEATS
         self.obj_light = [False] * SEATS
@@ -103,6 +130,7 @@ class Bus:
         self.obj_time = np.zeros(SEATS)
         self.obj_init = np.zeros(SEATS)
         self.rng2 = np.random.default_rng(rng.bit_generator.seed_seq.spawn(1)[0])
+        self.rng3 = np.random.default_rng(rng.bit_generator.seed_seq.spawn(1)[0])
         self.standing = []
         self.onboard = {}
         self.served = -1
@@ -117,7 +145,7 @@ class Bus:
         self.last_sms = -999
         self.outage_until = -1
         self.prev_fix = None
-        self.msgs = {"primary": 0, "sms": 0, "bytes_primary": 0, "bytes_sms": 0, "buffered": 0}
+        self.msgs = {"primary": 0, "sms": 0, "bytes_primary": 0, "bytes_sms": 0, "buffered": 0, "route": route}
         self.rng = rng
         self.age = 0
 
@@ -132,13 +160,16 @@ class Bus:
 
 
 class Cloud:
-    def __init__(self, name, stop_x):
+    def __init__(self, name, lines, stop_names):
         self.name = name
         self.state = {}
-        self.stop_x = stop_x
+        self.lines = lines
+        self.stop_names = stop_names
         self.boards = {}
-        default = 600.0 / 6.0 + 25.0
-        self.seg_time = [default] * len(stop_x)
+        self.seg_time = {}
+        for r, d in lines.items():
+            sd = d["stopdist"]
+            self.seg_time[r] = [(sd[k] - (sd[k - 1] if k else 0.0)) / 6.0 + 25.0 for k in range(len(sd))]
         self.last_stop = {}
 
     def receive(self, rep):
@@ -146,13 +177,14 @@ class Cloud:
         prev = self.state.get(b)
         if prev and rep["ts"] <= prev["ts"]:
             return
-        s = rep["served"]
+        r = rep["route"]
+        s = rep["k"]
         ls = self.last_stop.get(b)
         if ls is None or s > ls[0]:
             if ls is not None and s == ls[0] + 1 and s >= 1:
                 seg = rep["ts"] - ls[1]
                 if 20 < seg < 1800:
-                    self.seg_time[s] = 0.5 * seg + 0.5 * self.seg_time[s]
+                    self.seg_time[r][s] = 0.5 * seg + 0.5 * self.seg_time[r][s]
             self.last_stop[b] = (s, rep["ts"])
         self.state[b] = rep
 
@@ -160,32 +192,33 @@ class Cloud:
         self.state.pop(b, None)
         self.last_stop.pop(b, None)
 
-    def eta(self, r, si, now):
-        s = r["served"]
-        nxt = s + 1
-        if nxt > si:
+    def eta(self, r, g, now):
+        line = self.lines[r["route"]]
+        if g not in line["stops"]:
             return None
-        prev_x = self.stop_x[s] if s >= 0 else self.stop_x[0] - 600.0
-        span = max(1.0, self.stop_x[nxt] - prev_x)
-        frac = min(1.0, max(0.0, (self.stop_x[nxt] - r["x"]) / span))
-        rem = self.seg_time[nxt] * frac - (now - r["ts"])
-        rem = max(0.0, rem)
-        for k in range(nxt + 1, si + 1):
-            rem += self.seg_time[k]
+        kt = line["stops"].index(g)
+        nxt = r["k"] + 1
+        if nxt > kt:
+            return None
+        sd = line["stopdist"]
+        span = max(1.0, sd[nxt] - (sd[nxt - 1] if nxt else 0.0))
+        frac = min(1.0, max(0.0, r["dnext"] / span))
+        st = self.seg_time[r["route"]]
+        rem = max(0.0, st[nxt] * frac - (now - r["ts"]))
+        for k in range(nxt + 1, kt + 1):
+            rem += st[k]
         return rem
 
     def make_boards(self, now):
         out = {}
-        for si, sx in enumerate(self.stop_x):
+        for g, name in enumerate(self.stop_names):
             arrivals = []
             for b, r in self.state.items():
-                if r["served"] >= si:
-                    continue
-                e = self.eta(r, si, now)
+                e = self.eta(r, g, now)
                 if e is None:
                     continue
-                arrivals.append({"route": "21", "bus": b, "eta_s": e, "free_seats": r["free"], "updated_s": r["ts"]})
-            out[si] = build_stop_board(f"S{si+1:02d}", f"Stop {si+1}", arrivals, now)
+                arrivals.append({"route": r["route"], "bus": b, "eta_s": e, "free_seats": r["free"], "updated_s": r["ts"]})
+            out[g] = build_stop_board(name, f"Stop {name}", arrivals, now)
         self.boards = out
         return out
 
@@ -203,8 +236,12 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
     demand_rng = np.random.default_rng(seed)
     sc = build(seed)
     edges = sc["edges"]
-    stop_x = [x0 + STOP_POS + STOP_LEN / 2 for x0 in sc["edge_x0"]]
-    nstops = len(stop_x)
+    lines = sc["lines"]
+    stop_names = sc["stop_names"]
+    nstops = len(stop_names)
+    ncorr = len(edges)
+    route_of = {"line21": "21", "line22": "22"}
+    pos_in = {r: {g: i for i, g in enumerate(d["stops"])} for r, d in lines.items()}
     cfg = configure_for_environment(SeatConfig().validate(), ambient)
     default_cfg = SeatConfig().validate()
     cmd = [os.path.join(sumo.SUMO_HOME, "bin", "sumo"), "-n", sc["net"], "-a", sc["stops"],
@@ -213,7 +250,7 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
            "--end", str(SIM_END)]
     traci.start(cmd)
 
-    clouds = {"fallback": Cloud("fallback", stop_x), "primary_only": Cloud("primary_only", stop_x), "oracle": Cloud("oracle", stop_x)}
+    clouds = {k: Cloud(k, lines, stop_names) for k in ("fallback", "primary_only", "oracle")}
     shown = {k: {} for k in clouds}
     display_queue = {k: None for k in clouds}
     msg_stats = []
@@ -243,18 +280,37 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
         traci.simulationStep()
         t = int(traci.simulation.getTime())
 
-        for si in range(nstops):
-            lam = ARRIVAL_PER_MIN[si] / 60.0
-            if 300 <= t <= SIM_END - 1200 and lam > 0:
+        if 300 <= t <= SIM_END - 1200:
+            for si in range(ncorr):
+                lam = ARRIVAL_PER_MIN[si] / 60.0
+                if lam <= 0:
+                    continue
                 for _ in range(demand_rng.poisson(lam)):
                     k = 1 + demand_rng.poisson(5)
-                    dest = min(nstops - 1, si + k)
-                    if dest <= si:
+                    if si in SHARED and demand_rng.random() < BRANCH_DEST_SHARE:
+                        dest = lines["22"]["stops"][-1 - int(demand_rng.integers(0, 2))]
+                    else:
+                        dest = min(ncorr - 1, si + k)
+                    if dest == si:
                         continue
-                    p = Passenger(pid, si, dest, t, demand_rng)
+                    rs = feasible_routes(lines, pos_in, si, dest)
+                    if not rs:
+                        continue
+                    p = Passenger(pid, si, dest, t, demand_rng, rs)
                     pid += 1
                     passengers.append(p)
                     waiting[si].append(p)
+            seq22 = lines["22"]["stops"]
+            for j in (0, 1):
+                g = seq22[j]
+                lam = BRANCH_RATE_PER_MIN * DEMAND_SCALE / 60.0
+                for _ in range(demand_rng.poisson(lam)):
+                    dest = seq22[min(len(seq22) - 1, j + 1 + demand_rng.poisson(5))]
+                    rs = feasible_routes(lines, pos_in, g, dest)
+                    p = Passenger(pid, g, dest, t, demand_rng, rs)
+                    pid += 1
+                    passengers.append(p)
+                    waiting[g].append(p)
 
         while pending and pending[0][0] <= t:
             _, _, cname, rep = heapq.heappop(pending)
@@ -270,13 +326,13 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
                 del buses[vid]
         for vid in active:
             if vid.startswith("bus") and vid not in buses and vid not in finished:
-                buses[vid] = Bus(vid, np.random.default_rng(rng.integers(1 << 30)))
+                buses[vid] = Bus(vid, np.random.default_rng(rng.integers(1 << 30)), route_of[traci.vehicle.getRouteID(vid)])
 
         for vid, bus in buses.items():
             x, y = traci.vehicle.getPosition(vid)
             v = traci.vehicle.getSpeed(vid)
             road = traci.vehicle.getRoadID(vid)
-            edge_idx = edges.index(road) if road in edges else min(nstops - 1, int(x // 600))
+            edge_idx = edges.index(road) if road in edges else -1
             lat, lon = to_latlon(x, y)
             fix = parse_nmea_rmc(build_nmea_rmc(lat, lon, v))
             bus.x, bus.v = x, v
@@ -284,21 +340,25 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
             if t % 10 == 0:
                 traj.append((vid, t, round(x, 1), bus.load(), bus.gt_free()))
 
+            line = lines[bus.route]
             if bus.dwell_until is None and traci.vehicle.isStopped(vid):
                 stops = traci.vehicle.getStops(vid, 1)
-                if stops and stops[0].arrival >= 0 and stops[0].stoppingPlaceID.startswith("S"):
-                    si = int(stops[0].stoppingPlaceID[1:]) - 1
-                    if si > bus.served:
+                if stops and stops[0].arrival >= 0 and stops[0].stoppingPlaceID in stop_names:
+                    si = stop_names.index(stops[0].stoppingPlaceID)
+                    kk = pos_in[bus.route].get(si, -1)
+                    if kk > bus.k:
                         arrivals_log.append(arrival_record(bus, si, t, clouds, shown))
-                        nb, na, lb = serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, shelter[si])
+                        nb, na, lb = serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, shelter[si], line)
                         left_behind += lb
                         bus.dwell_until = t + DWELL_BASE + DWELL_BOARD * nb + DWELL_ALIGHT * na
                         bus.door_open = True
                         bus.served = si
+                        bus.k = kk
             elif bus.dwell_until is not None and t >= bus.dwell_until:
                 bus.dwell_until = None
                 bus.door_open = False
                 bus.last_pub = -999
+                bus.sms_door_due = True
                 try:
                     traci.vehicle.resume(vid)
                 except Exception:
@@ -313,20 +373,30 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
             if bus.outage_until < t and rng.random() < OUTAGE_RATE:
                 bus.outage_until = t + rng.exponential(OUTAGE_MEAN_S)
 
+            nk = bus.k + 1
+            if nk < len(line["stops"]):
+                try:
+                    tgt = traci.busstop.getLaneID(stop_names[line["stops"][nk]]).rsplit("_", 1)[0]
+                    d = traci.vehicle.getDrivingDistance(vid, tgt, STOP_POS + STOP_LEN / 2)
+                    bus.dnext = d if d >= 0 else 0.0
+                except Exception:
+                    bus.dnext = 0.0
+            else:
+                bus.dnext = 0.0
             sense(bus, t, cfg, default_cfg, conf, ambient, blind)
             est_free = sum(1 for s in bus.est_states if s == EMPTY)
             gt = bus.gt_free()
             free_err_t.append(est_free - gt)
 
-            orep = {"bus": vid, "x": x, "v": v, "free": gt, "ts": t, "served": bus.served}
+            orep = {"bus": vid, "route": bus.route, "dnext": bus.dnext, "free": gt, "ts": t, "k": bus.k}
             clouds["oracle"].receive(orep)
 
             mode = link_mode(bus, edge_idx, t)
             due_primary = (t - bus.last_pub) >= PUBLISH_EVERY
             if due_primary:
                 bus.seq += 1
-                summ = build_seat_summary(vid, "21", bus.seq, fix, bus.est_states, bus.door_open, t)
-                rep = {"bus": vid, "x": x, "v": v, "free": summ["free_seats"], "ts": t, "served": bus.served}
+                summ = build_seat_summary(vid, bus.route, bus.seq, fix, bus.est_states, bus.door_open, t)
+                rep = {"bus": vid, "route": bus.route, "dnext": bus.dnext, "free": summ["free_seats"], "ts": t, "k": bus.k}
                 bus.last_pub = t
                 if mode == "primary":
                     lat_s = float(np.clip(rng.lognormal(math.log(0.3), 0.5), 0.05, 5.0))
@@ -337,8 +407,10 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
                         heapq.heappush(pending, (t + math.ceil(lat_s), tiebreak, cname, rep))
                 else:
                     bus.msgs["buffered"] += 1
-                    if mode == "sms" and (t - bus.last_sms) >= SMS_EVERY:
+                    if mode == "sms" and sms_due(bus, summ["free_seats"], t):
                         bus.last_sms = t
+                        bus.last_sms_free = summ["free_seats"]
+                        bus.sms_door_due = False
                         bus.msgs["sms"] += 1
                         bus.msgs["bytes_sms"] += len(build_sms_summary(summ))
                         lat_s = float(np.clip(rng.normal(5, 2), 1, 20))
@@ -372,12 +444,36 @@ def run(seed, scenario, out_dir, ambient=MAIN_AMBIENT):
     result["shelter"] = shelter.astype(int).tolist()
     result["params"] = {"BETA_0": BETA_0, "BETA_WAIT": BETA_WAIT, "BETA_SEAT": BETA_SEAT, "BETA_CROWD": BETA_CROWD,
                         "BETA_WAITED": BETA_WAITED, "KAPPA_EXPOSURE": KAPPA_EXPOSURE, "SEEK_PROB": SEEK_PROB,
-                        "DEMAND_SCALE": DEMAND_SCALE, "OUTAGE_RATE": OUTAGE_RATE}
+                        "DEMAND_SCALE": DEMAND_SCALE, "OUTAGE_RATE": OUTAGE_RATE, "SMS_MODE": SMS_MODE,
+                        "FILTER_MODE": FILTER_MODE}
+    result["lines"] = {r: {"stops": d["stops"], "stopdist": d["stopdist"], "length_m": d["length_m"]} for r, d in lines.items()}
+    result["stop_names"] = stop_names
     result["traj"] = traj
     result["snapshots"] = snapshots
     with open(os.path.join(out_dir, f"result_{scenario}_{seed}.json"), "w") as f:
         json.dump(result, f)
     return result
+
+
+def feasible_routes(lines, pos_in, o, d):
+    out = []
+    for r in lines:
+        po, pd = pos_in[r].get(o), pos_in[r].get(d)
+        if po is not None and pd is not None and pd > po:
+            out.append(r)
+    return tuple(out)
+
+
+def sms_due(bus, free, t):
+    if SMS_MODE == "timer":
+        return (t - bus.last_sms) >= SMS_EVERY
+    if bus.sms_door_due:
+        return True
+    if bus.last_sms_free is None:
+        return True
+    if abs(free - bus.last_sms_free) >= SMS_DELTA or ((free == 0) != (bus.last_sms_free == 0)):
+        return True
+    return (t - bus.last_sms) >= SMS_KEEPALIVE
 
 
 def display_for(shown, cname, si):
@@ -389,7 +485,7 @@ def display_for(shown, cname, si):
 
 
 def arrival_record(bus, si, t, clouds, shown):
-    rec = {"bus": bus.vid, "stop": si, "t": t, "gt_free": bus.gt_free(), "load": bus.load()}
+    rec = {"bus": bus.vid, "route": bus.route, "stop": si, "t": t, "gt_free": bus.gt_free(), "load": bus.load()}
     for cname in clouds:
         bd = display_for(shown, cname, si)
         val = None
@@ -409,6 +505,8 @@ def wait_utility(eta_min, p_seat_next, load_frac, waited_min, sheltered):
 
 
 def skip_decision(p, bus, si, t, scenario, shown, rng, sheltered, seekers_waiting):
+    if bus.route not in p.routes:
+        return False
     if scenario == "A" or not p.wants_seat:
         return False
     cname = "fallback" if scenario == "B_real" else "oracle"
@@ -420,7 +518,7 @@ def skip_decision(p, bus, si, t, scenario, shown, rng, sheltered, seekers_waitin
     for row in bd["rows"]:
         if row["bus"] == bus.vid:
             this_row = row
-        else:
+        elif row["route"] in p.routes:
             later.append(row)
     if this_row is None or this_row["free_seats"] > 0:
         return False
@@ -466,7 +564,7 @@ def take_seat(bus, p):
     return True
 
 
-def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, sheltered=True):
+def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, sheltered=True, line=None):
     alight = [p for p in bus.onboard.values() if p.dest == si]
     for p in alight:
         del bus.onboard[p.pid]
@@ -478,7 +576,8 @@ def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, sheltere
                 bus.obj_light[i] = False
         if p in bus.standing:
             bus.standing.remove(p)
-        dist_km = (p.dest - p.origin) * 0.6
+        po, pd = line["stops"].index(p.origin), line["stops"].index(p.dest)
+        dist_km = (line["stopdist"][pd] - line["stopdist"][po]) / 1000.0
         rider = verify_rider(IdentityMode.PUBLIC_TICKET, p.credential, None)
         for name, pol in FARE_POLICIES.items():
             if p.female_free:
@@ -493,9 +592,12 @@ def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, sheltere
     boarded = 0
     lb = 0
     queue = waiting[si]
-    seekers_waiting = sum(1 for q in queue if q.wants_seat)
+    seekers_waiting = sum(1 for q in queue if q.wants_seat and bus.route in q.routes)
     stay = []
     for p in queue:
+        if bus.route not in p.routes:
+            stay.append(p)
+            continue
         if bus.load() >= SEATS + STANDING:
             stay.append(p)
             lb += 1
@@ -508,6 +610,7 @@ def serve_stop(bus, si, t, waiting, scenario, shown, rng, trips, fares, sheltere
             continue
         p.t_board = t
         p.bus = bus.vid
+        p.route = bus.route
         bus.onboard[p.pid] = p
         if take_seat(bus, p):
             p.seated_at_board = True
@@ -555,28 +658,31 @@ def sense(bus, t, cfg, default_cfg, conf, ambient, blind):
         out = np.where(occ, t_occ, np.where(obj, t_obj, base))
         return out + rng2.normal(0, noise_sd, SEATS)
 
-    tm = temps_v1(ambient)
-    for i in range(SEATS):
-        p = pressure[i]
-        if p < cfg.pressure_threshold:
-            raw = EMPTY
-        elif not cfg.temperature_check_enabled or (cfg.temp_min_c <= tm[i] <= cfg.temp_max_c):
-            raw = OCCUPIED
-        else:
-            raw = OBJECT
-        if raw == bus.debounce_state[i]:
-            bus.debounce_cand[i] = raw
-            bus.debounce_count[i] = 0
-        else:
-            if raw == bus.debounce_cand[i]:
-                bus.debounce_count[i] += 1
+    if FILTER_MODE == "legacy_model":
+        tm = temps_v1(ambient)
+        for i in range(SEATS):
+            p = pressure[i]
+            if p < cfg.pressure_threshold:
+                raw = EMPTY
+            elif not cfg.temperature_check_enabled or (cfg.temp_min_c <= tm[i] <= cfg.temp_max_c):
+                raw = OCCUPIED
             else:
+                raw = OBJECT
+            if raw == bus.debounce_state[i]:
                 bus.debounce_cand[i] = raw
-                bus.debounce_count[i] = 1
-            if bus.debounce_count[i] >= cfg.debounce_samples:
-                bus.debounce_state[i] = raw
                 bus.debounce_count[i] = 0
-    bus.est_states = list(bus.debounce_state)
+            else:
+                if raw == bus.debounce_cand[i]:
+                    bus.debounce_count[i] += 1
+                else:
+                    bus.debounce_cand[i] = raw
+                    bus.debounce_count[i] = 1
+                if bus.debounce_count[i] >= cfg.debounce_samples:
+                    bus.debounce_state[i] = raw
+                    bus.debounce_count[i] = 0
+        bus.est_states = list(bus.debounce_state)
+    else:
+        filtered_states(bus, occ, obj, light, moving, t, ambient, temps)
 
     if t % 5 == 0:
         settled = occ & (bus.sit_time > 90)
@@ -603,6 +709,71 @@ def sense(bus, t, cfg, default_cfg, conf, ambient, blind):
                         else:
                             pred = 1
                         conf[amb][key][truth, pred] += 1
+
+
+def filtered_states(bus, occ, obj, light, moving, t, ambient, temps):
+    rng = bus.rng3
+    n = SEATS
+    fresh_occ = occ & (bus.sit_time == 1)
+    fresh_obj = obj & (bus.obj_time == 1)
+    bus.lvl = np.where(fresh_occ, rng.normal(2600, 350, n), bus.lvl)
+    bus.lvl = np.where(fresh_obj, np.where(light, rng.normal(700, 200, n), rng.normal(1900, 350, n)), bus.lvl)
+    level = np.where(occ | obj, np.clip(bus.lvl, 0, 4095), 300.0)
+    shock = np.zeros(SUBSAMPLES)
+    if moving and rng.random() < SHOCKS_PER_S:
+        m = int(rng.integers(1, 3))
+        i0 = int(rng.integers(0, SUBSAMPLES - m + 1))
+        peak = rng.uniform(0.4, 1.4) * rng.choice([-1.0, 1.0])
+        shock[i0:i0 + m] = peak * np.sin(math.pi * (np.arange(m) + 0.5) / m)
+    a = FCFG.ema_alpha
+    was_loaded = bus.loaded.copy()
+    first = None
+    for k in range(SUBSAMPLES):
+        g = 1.0 + (rng.normal(0, VIB_RMS) / 9.81 if moving else 0.0) + shock[k]
+        x = np.where(occ | obj, level * min(max(g, 0.0), 3.0), level) + rng.normal(0, 25, n)
+        x = np.clip(x, 0, 4095)
+        if first is None:
+            first = x.copy()
+        bus.win[bus.widx] = x
+        bus.widx = (bus.widx + 1) % FCFG.median_window
+        med = np.median(bus.win, axis=0)
+        bus.ema = a * med + (1 - a) * bus.ema
+        net = bus.ema - bus.base
+        bus.loaded = np.where(bus.loaded, net >= FCFG.exit_counts, net >= FCFG.enter_counts)
+        idle = ~bus.loaded
+        bus.base = np.where(idle, np.clip(bus.base + FCFG.baseline_rate * (bus.ema - bus.base), 0.0, FCFG.baseline_cap), bus.base)
+    if FILTER_MODE == "debounce":
+        raw = first >= FCFG.enter_counts
+        agree = raw == bus.db_cand
+        bus.db_count = np.where(raw == bus.db_state, 0, np.where(agree, bus.db_count + 1, 1))
+        bus.db_cand = raw
+        flip = bus.db_count >= 3
+        bus.db_state = np.where(flip, raw, bus.db_state)
+        bus.db_count = np.where(flip, 0, bus.db_count)
+        bus.loaded = bus.db_state.copy()
+    newly = bus.loaded & ~was_loaded
+    for i in np.where(newly)[0]:
+        bus.th_state[i] = OCCUPIED
+    if t % 5 == 0 and bus.loaded.any():
+        idx = np.where(bus.loaded)[0]
+        lag = np.minimum(np.where(occ, bus.sit_time, bus.obj_time), THERMAL_CFG.window_s)
+        sd5 = 0.25 / math.sqrt(THERMAL_CFG.smooth_n)
+        contact = bus.skin + SKIN_PULL * (ambient - bus.skin)
+        base_t = []
+        for lg in (0.0, lag):
+            st_ = np.maximum(bus.sit_time - lg, 0.0)
+            ot_ = np.maximum(bus.obj_time - lg, 0.0)
+            t_occ = contact + (ambient - contact) * np.exp(-st_ / TAU_S)
+            t_obj = ambient + bus.obj_init * np.exp(-ot_ / BAG_TAU_S)
+            base_t.append(np.where(occ, t_occ, np.where(obj, t_obj, ambient)) + rng.normal(0, sd5, n))
+        ta, tb = base_t
+        cabin = ambient + rng.normal(0, sd5)
+        for i in idx:
+            if not (occ[i] or obj[i]):
+                continue
+            st, _ = differential_classify(ta[i] - cabin, tb[i] - cabin, ta[i], cabin, THERMAL_CFG)
+            bus.th_state[i] = st
+    bus.est_states = [bus.th_state[i] if bus.loaded[i] else EMPTY for i in range(n)]
 
 
 def summarise(seed, scenario, passengers, arrivals_log, eta_preds, staleness, free_err_t, conf, buses_msgs, left_behind, trips, fares, wall):

@@ -15,8 +15,10 @@ HUMAN_TEMP_MAX = 42.0
 
 START_LAT, START_LNG = 12.9692, 79.1559
 END_LAT, END_LNG = 12.9725, 79.1630
-MAX_PASSENGERS = 30
-FIRST_STUDENT_ID = 21001
+SEAT_CAPACITY = 44
+STANDING_CAPACITY = 25
+MAX_PASSENGERS = SEAT_CAPACITY + STANDING_CAPACITY
+FIRST_RIDER_ID = 21001
 FARE_PER_KM = 5.0
 MINIMUM_FARE = 2.0
 GPS_CHANGE_STEP = 5
@@ -32,7 +34,7 @@ def distance_km(lat1, lon1, lat2, lon2):
 class ShuttleGUI:
     def __init__(self, root):
         self.root = root
-        root.title('VIT Smart Shuttle System - Python GUI (Rev. 2)')
+        root.title('VIT Smart Shuttle System - Python GUI (Rev. 4)')
         root.geometry('1150x800')
 
         self.pressure = tk.IntVar(value=0)
@@ -48,8 +50,8 @@ class ShuttleGUI:
         self.mqtt = tk.StringVar(value='MQTT ONLINE')
         self.stationary_var = tk.StringVar(value='STATIONARY')
         self.door_var = tk.StringVar(value='OPEN')
-        self.passengers_var = tk.StringVar(value='0 / 30')
-        self.free = tk.StringVar(value='30')
+        self.passengers_var = tk.StringVar(value=f'0 / {MAX_PASSENGERS}')
+        self.free = tk.StringVar(value=str(SEAT_CAPACITY))
         self.dist = tk.StringVar(value='0.00 km')
         self.fare = tk.StringVar(value='\u20b90.00')
         self.temp_disp = tk.StringVar(value='36.7 \u00b0C')
@@ -58,19 +60,19 @@ class ShuttleGUI:
         self.current_lng = START_LNG
         self.prev_route = -1
         self.people = []
-        self.next_id = FIRST_STUDENT_ID
+        self.next_id = FIRST_RIDER_ID
         self.last_gps_slider = None
 
         self.build()
-        self.log('VIT SMART SHUTTLE SYSTEM (Rev. 2)')
+        self.log('VIT SMART SHUTTLE SYSTEM (Rev. 4)')
         self.log('Python GUI simulation ready.')
         self.log('Short face scan = ENTRY | Long face scan = EXIT')
         self.log('Face scans now require: vehicle STATIONARY + door OPEN')
-        self.log("Seat states: EMPTY / OBJECT (non-human) / STUDENT (human)")
+        self.log("Seat states: EMPTY / OBJECT (non-human) / OCCUPIED (human)")
         self.update()
 
     def build(self):
-        ttk.Label(self.root, text='VIT SMART SHUTTLE SYSTEM (Rev. 2)', font=('Arial', 22, 'bold')).pack(pady=10)
+        ttk.Label(self.root, text='VIT SMART SHUTTLE SYSTEM (Rev. 4)', font=('Arial', 22, 'bold')).pack(pady=10)
         main = ttk.Frame(self.root, padding=10)
         main.pack(fill='both', expand=True)
         main.columnconfigure((0, 1), weight=1)
@@ -186,16 +188,16 @@ class ShuttleGUI:
         if p < PRESSURE_THRESHOLD:
             new = 'EMPTY'
         elif HUMAN_TEMP_MIN <= t <= HUMAN_TEMP_MAX:
-            new = 'STUDENT'
+            new = 'OCCUPIED'
         else:
             new = 'OBJECT'
         self.seat.set(new)
         self.temp_disp.set(f'{t:.1f} \u00b0C')
         if new != old:
             note = ''
-            if new == 'STUDENT' and t >= 41.5:
+            if new == 'OCCUPIED' and t >= 41.5:
                 note = '  (HYPERPYREXIA range, medical emergency, still HUMAN)'
-            elif new == 'STUDENT' and t >= 38.0:
+            elif new == 'OCCUPIED' and t >= 38.0:
                 note = '  (FEVER range, still classified HUMAN)'
             self.log(f'[SEAT] State={new}, Pressure={p}, Temperature={t:.1f} C{note}')
             self.publish('vit/shuttle1/seat', f'{new},TEMP={t:.1f},PRESSURE={p}')
@@ -204,7 +206,7 @@ class ShuttleGUI:
         if not self.scan_allowed('ENTRY'):
             return
         if len(self.people) >= MAX_PASSENGERS:
-            self.log('[ENTRY DENIED] SHUTTLE FULL')
+            self.log(f'[ENTRY DENIED] BUS FULL ({SEAT_CAPACITY} SEATED + {STANDING_CAPACITY} STANDING)')
             return
         pid = self.next_id
         self.next_id += 1
@@ -230,7 +232,7 @@ class ShuttleGUI:
 
     def refresh_people(self):
         self.passengers_var.set(f'{len(self.people)} / {MAX_PASSENGERS}')
-        self.free.set(str(MAX_PASSENGERS - len(self.people)))
+        self.free.set(str(max(0, SEAT_CAPACITY - len(self.people))))
 
     def update(self):
         self.update_gps()

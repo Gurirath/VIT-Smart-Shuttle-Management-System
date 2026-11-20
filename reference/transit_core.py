@@ -423,7 +423,7 @@ STALE_AFTER_S = 60
 
 def seat_label(free_seats):
     if free_seats <= 0:
-        return "NO SEATS"
+        return "0 SEATS (STANDING ONLY)"
     if free_seats <= FEW_SEATS_LIMIT:
         return "FEW SEATS"
     return "SEATS AVAILABLE"

@@ -4,10 +4,17 @@
 #include <DallasTemperature.h>
 #include <math.h>
 
+void publishMQTT(const char* topic, String payload);
+double calculateDistanceKm(double lat1, double lon1, double lat2, double lon2);
+bool isVehicleStationary();
+bool isDoorOpen();
+int classifyLoadedSeat();
+void samplePressure();
+
 // ============================================================
 //              VIT SMART SHUTTLE SYSTEM
 //                 WOKWI ESP32 SIMULATION
-//                  (Revision 3 — see change log)
+//                  (Revision 4 — see change log)
 // ============================================================
 //
 // CHANGE LOG (this revision vs. previous version):
@@ -35,6 +42,15 @@
 //     in the blind band (cabin about 32-38 C) are flagged BLIND. The
 //     34-42 C band of item 2 is now only the fallback when the cabin
 //     probe is missing (flag PROBE_FAULT).
+//  5. Revision 4: seat probes are split over four OneWire buses,
+//     one per seating zone of 11 seats (GPIO 18, 25, 26, 27), and
+//     the cabin probe has its own bus on GPIO 23, so a shorted probe
+//     or cut wire disables one zone only. The occupant state is
+//     OCCUPIED (was STUDENT) and capacity is 44 seats plus 25
+//     standing (was 30). On GSM fallback the seat summary goes out
+//     as an SMS on door close, on a change of two or more free
+//     seats, when the bus becomes full or frees a seat, and at
+//     least every 300 s, instead of every 30 s.
 //
 // ============================================================
 
@@ -48,15 +64,24 @@
 #define FACE_BUTTON      4   // pushbutton — simulates a face-scan attempt
 #define WIFI_SWITCH      5   // slide switch — HIGH = WiFi available, LOW = GSM fallback
 #define DOOR_SWITCH     19   // slide switch — HIGH = door open,      LOW = door closed
-#define TEMP_PIN        18   // DS18B20 data pin
+#define CABIN_PIN       23   // DS18B20 cabin-air probe, own OneWire bus
 
 
 // ============================================================
 // TEMPERATURE SENSOR
 // ============================================================
 
-OneWire oneWire(TEMP_PIN);
-DallasTemperature tempSensor(&oneWire);
+const int ZONE_COUNT = 4;
+const int SEATS_PER_ZONE = 11;
+const uint8_t ZONE_PINS[ZONE_COUNT] = {18, 25, 26, 27};
+OneWire zoneWire[ZONE_COUNT] = {OneWire(18), OneWire(25), OneWire(26), OneWire(27)};
+DallasTemperature zoneSensor[ZONE_COUNT] = {DallasTemperature(&zoneWire[0]), DallasTemperature(&zoneWire[1]),
+                                            DallasTemperature(&zoneWire[2]), DallasTemperature(&zoneWire[3])};
+int zoneProbeCount[ZONE_COUNT] = {0, 0, 0, 0};
+bool zoneFault[ZONE_COUNT] = {false, false, false, false};
+OneWire cabinWire(CABIN_PIN);
+DallasTemperature cabinSensor(&cabinWire);
+const int PROTO_SEAT_ZONE = 0;
 
 float currentTemperature = 36.7;
 float cabinTemperature = NAN;
@@ -90,7 +115,7 @@ const float HUMAN_TEMP_MAX = 42.0;
 
 // 0 = EMPTY
 // 1 = OBJECT   (non-human occupant: bag, luggage, or any other item)
-// 2 = STUDENT  (human occupant, including a feverish/unwell student)
+// 2 = OCCUPIED (human occupant, including a feverish/unwell rider)
 
 int seatState = 0;
 int previousSeatState = -1;
@@ -233,8 +258,10 @@ void checkMotionEvent()
 // PASSENGERS
 // ============================================================
 
-const int MAX_PASSENGERS = 30;
-const long FIRST_STUDENT_ID = 21001;
+const int SEAT_CAPACITY = 44;
+const int STANDING_CAPACITY = 25;
+const int MAX_PASSENGERS = SEAT_CAPACITY + STANDING_CAPACITY;
+const long FIRST_RIDER_ID = 21001;
 
 int passengerCount = 0;
 long passengerIDs[MAX_PASSENGERS];
@@ -282,7 +309,7 @@ const char* getSeatName()
 {
   if (seatState == 0) return "EMPTY";
   if (seatState == 1) return "OBJECT";
-  return "STUDENT";
+  return "OCCUPIED";
 }
 
 
@@ -292,7 +319,11 @@ const char* getSeatName()
 
 void requestTemperature()
 {
-  tempSensor.requestTemperatures();
+  for (int z = 0; z < ZONE_COUNT; z++)
+  {
+    if (zoneProbeCount[z] > 0) zoneSensor[z].requestTemperatures();
+  }
+  cabinSensor.requestTemperatures();
   lastTempRequest = millis();
 }
 
@@ -337,14 +368,12 @@ void updateTemperature()
 {
   if (millis() - lastTempRequest >= 1000)
   {
-    float newTemperature = tempSensor.getTempCByIndex(0);
-    if (newTemperature > -100 && newTemperature < 150)
+    float newTemperature = zoneSensor[PROTO_SEAT_ZONE].getTempCByIndex(0);
+    zoneFault[PROTO_SEAT_ZONE] = !probeValid(newTemperature);
+    currentTemperature = zoneFault[PROTO_SEAT_ZONE] ? NAN : newTemperature;
+    if (probeCount > 0)
     {
-      currentTemperature = newTemperature;
-    }
-    if (probeCount > 1)
-    {
-      float newCabin = tempSensor.getTempCByIndex(1);
+      float newCabin = cabinSensor.getTempCByIndex(0);
       cabinTemperature = probeValid(newCabin) ? newCabin : NAN;
     }
     if (seatLoaded && probeValid(currentTemperature) && probeValid(cabinTemperature))
@@ -462,6 +491,7 @@ double calculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
 // ============================================================
 
 bool wifiAvailable() { return digitalRead(WIFI_SWITCH) == HIGH; }
+void checkSummary();
 
 
 // ============================================================
@@ -596,6 +626,66 @@ void checkGPS()
 
 
 // ============================================================
+// SEAT SUMMARY (every 10 s on the primary link; event-driven SMS on GSM)
+// ============================================================
+
+const unsigned long SUMMARY_MS = 10000;
+const unsigned long SMS_KEEPALIVE_MS = 300000;
+const int SMS_DELTA = 2;
+unsigned long lastSummary = 0;
+unsigned long lastSms = 0;
+int lastSmsFree = -1;
+bool smsDoorDue = false;
+bool summaryDoorWasOpen = true;
+int summarySeq = 0;
+
+int freeSeatsSensed()
+{
+  return seatState == 0 ? 1 : 0;
+}
+
+bool smsDue(int freeNow)
+{
+  if (smsDoorDue) return true;
+  if (lastSmsFree < 0) return true;
+  if (abs(freeNow - lastSmsFree) >= SMS_DELTA) return true;
+  if ((freeNow == 0) != (lastSmsFree == 0)) return true;
+  return millis() - lastSms >= SMS_KEEPALIVE_MS;
+}
+
+void checkSummary()
+{
+  bool doorOpenNow = isDoorOpen();
+  bool doorClosed = summaryDoorWasOpen && !doorOpenNow;
+  summaryDoorWasOpen = doorOpenNow;
+  if (doorClosed) smsDoorDue = true;
+  int freeNow = freeSeatsSensed();
+  String payload = "SUM,SEQ=" + String(summarySeq) + ",FREE=" + String(freeNow) + ",SENSED=1,SEATS=" + String(SEAT_CAPACITY)
+                   + ",DOOR=" + String(doorOpenNow ? "OPEN" : "CLOSED") + "," + String(currentLat, 6) + "," + String(currentLng, 6);
+  bool primary = wifiAvailable() && WiFi.status() == WL_CONNECTED && mqtt.connected();
+  if (primary)
+  {
+    if (doorClosed || millis() - lastSummary >= SUMMARY_MS)
+    {
+      summarySeq++;
+      lastSummary = millis();
+      publishMQTT("vit/shuttle1/summary", payload);
+    }
+    return;
+  }
+  if (smsDue(freeNow))
+  {
+    summarySeq++;
+    lastSms = millis();
+    lastSmsFree = freeNow;
+    smsDoorDue = false;
+    Serial.print("[GSM SMS] ");
+    Serial.println(payload);
+  }
+}
+
+
+// ============================================================
 // SEAT CLASSIFICATION
 // ============================================================
 
@@ -634,7 +724,7 @@ void checkSeat()
 
     if (seatState == 0)      Serial.println("Result      : SEAT EMPTY");
     else if (seatState == 1) Serial.println("Result      : NON-HUMAN OBJECT (e.g. bag / luggage)");
-    else                     Serial.println("Result      : HUMAN OCCUPANT (STUDENT)");
+    else                     Serial.println("Result      : HUMAN OCCUPANT (OCCUPIED)");
 
     Serial.println("========================================");
 
@@ -760,12 +850,12 @@ void passengerEntry()
   if (passengerCount >= MAX_PASSENGERS)
   {
     Serial.println();
-    Serial.println("[ENTRY DENIED] SHUTTLE FULL");
+    Serial.println("[ENTRY DENIED] BUS FULL (44 SEATED + 25 STANDING)");
     return;
   }
 
   int index = passengerCount;
-  passengerIDs[index] = FIRST_STUDENT_ID + index;
+  passengerIDs[index] = FIRST_RIDER_ID + index;
   entryLat[index] = currentLat;
   entryLng[index] = currentLng;
   passengerCount++;
@@ -775,7 +865,7 @@ void passengerEntry()
   Serial.println("           FACE SCAN - ENTRY");
   Serial.println("========================================");
   Serial.println("Face scan : VERIFIED");
-  Serial.print("Student   : VIT");
+  Serial.print("Rider     : VIT");
   Serial.println(passengerIDs[index]);
   Serial.print("Location  : ");
   Serial.print(currentLat, 6);
@@ -786,7 +876,7 @@ void passengerEntry()
   Serial.print(" / ");
   Serial.println(MAX_PASSENGERS);
   Serial.print("Seats free: ");
-  Serial.println(MAX_PASSENGERS - passengerCount);
+  Serial.println(max(0, SEAT_CAPACITY - passengerCount));
   Serial.println("Status    : ON BOARD");
   Serial.println("========================================");
 
@@ -820,7 +910,7 @@ void passengerExit()
   Serial.println("            TRIP COMPLETED");
   Serial.println("========================================");
   Serial.println("Face scan : VERIFIED");
-  Serial.print("Student   : VIT");
+  Serial.print("Rider     : VIT");
   Serial.println(passengerIDs[index]);
   Serial.print("Distance  : ");
   Serial.print(distance, 2);
@@ -887,22 +977,37 @@ void setup()
   pinMode(WIFI_SWITCH, INPUT_PULLUP);
   pinMode(DOOR_SWITCH, INPUT_PULLUP);
 
-  tempSensor.begin();
-  probeCount = tempSensor.getDeviceCount();
-  tempSensor.setResolution(9);
-  tempSensor.setWaitForConversion(false);
+  for (int z = 0; z < ZONE_COUNT; z++)
+  {
+    zoneSensor[z].begin();
+    zoneProbeCount[z] = zoneSensor[z].getDeviceCount();
+    zoneSensor[z].setResolution(9);
+    zoneSensor[z].setWaitForConversion(false);
+  }
+  cabinSensor.begin();
+  probeCount = cabinSensor.getDeviceCount();
+  cabinSensor.setResolution(9);
+  cabinSensor.setWaitForConversion(false);
 
   delay(1000);
 
   Serial.println();
   Serial.println("============================================================");
   Serial.println("              VIT SMART SHUTTLE SYSTEM");
-  Serial.println("                 WOKWI SIMULATION  (Rev. 2)");
+  Serial.println("                 WOKWI SIMULATION  (Rev. 4)");
   Serial.println("============================================================");
   Serial.println("[SYSTEM] ESP32 initialized");
   Serial.println("[SYSTEM] GPIO34 = seat pressure sensor");
   Serial.println("[SYSTEM] GPIO35 = GPS simulator");
-  Serial.println("[SYSTEM] GPIO18 = DS18B20 seat probe (index 0) + cabin probe (index 1)");
+  Serial.println("[SYSTEM] GPIO18/25/26/27 = DS18B20 seat-probe buses, zones 1-4 (11 seats each)");
+  Serial.println("[SYSTEM] GPIO23 = DS18B20 cabin-air probe (own bus)");
+  for (int z = 0; z < ZONE_COUNT; z++)
+  {
+    Serial.print("[SYSTEM] Zone ");
+    Serial.print(z + 1);
+    Serial.print(" probes found: ");
+    Serial.println(zoneProbeCount[z]);
+  }
   Serial.println("[SYSTEM] GPIO4  = face scan button");
   Serial.println("[SYSTEM] GPIO5  = WiFi/GSM switch");
   Serial.println("[SYSTEM] GPIO19 = door open/closed switch");
@@ -913,12 +1018,12 @@ void setup()
 
   requestTemperature();
   delay(150);
-  currentTemperature = tempSensor.getTempCByIndex(0);
-  if (currentTemperature < -100 || currentTemperature > 150) currentTemperature = 36.7;
+  currentTemperature = zoneSensor[PROTO_SEAT_ZONE].getTempCByIndex(0);
+  if (!probeValid(currentTemperature)) currentTemperature = NAN;
 
-  if (probeCount > 1)
+  if (probeCount > 0)
   {
-    cabinTemperature = tempSensor.getTempCByIndex(1);
+    cabinTemperature = cabinSensor.getTempCByIndex(0);
     if (!probeValid(cabinTemperature)) cabinTemperature = NAN;
   }
   seatState = 0;
@@ -959,6 +1064,7 @@ void loop()
   checkMotionEvent();
   checkNetwork();
   checkButton();
+  checkSummary();
 
   if (WiFi.status() == WL_CONNECTED)
   {

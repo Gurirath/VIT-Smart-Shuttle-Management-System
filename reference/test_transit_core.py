@@ -179,7 +179,7 @@ def test_board_rows_sorted_and_flagged():
     board = build_stop_board("S05", "Main Gate", arrivals, now_s=200)
     assert [r["bus"] for r in board["rows"]] == ["B1", "B2", "B3"]
     assert board["rows"][0]["label"] == "SEATS AVAILABLE"
-    assert board["rows"][1]["label"] == "NO SEATS" and board["rows"][1]["approximate"]
+    assert board["rows"][1]["label"] == "0 SEATS (STANDING ONLY)" and board["rows"][1]["approximate"]
     assert board["rows"][2]["label"] == "FEW SEATS"
     assert seat_label(5) == "FEW SEATS" and seat_label(6) == "SEATS AVAILABLE"
 

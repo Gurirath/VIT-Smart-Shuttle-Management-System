@@ -30,7 +30,7 @@ fig.savefig(os.path.join(FIG, "fig_storage.png"))
 plt.close(fig)
 
 fig, ax = plt.subplots(figsize=(5.6, 2.4))
-cases = ["Bus full\n(30/30, 31st refused)", "Empty route\n(idle state)", "Rapid polling\n(15 entry/exit cycles)"]
+cases = ["Bus full\n(69/69, 70th refused)", "Empty route\n(idle state)", "Rapid polling\n(15 entry/exit cycles)"]
 ax.barh(range(3), [1, 1, 1], color=S3, height=0.6)
 for i in range(3):
     ax.text(0.5, i, "PASS", ha="center", va="center", color="white", weight="bold")

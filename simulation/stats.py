@@ -76,7 +76,7 @@ def paired(variant):
     return res
 
 
-VARIANTS = ["seek40", "seek80", "noshelter", "outage3x", "demand120", "demand80"]
+VARIANTS = ["seek40", "seek80", "noshelter", "outage3x", "demand120", "demand80", "debounce", "smstimer"]
 BETA_WAIT = [-0.15, -0.25, -0.35, -0.5, -0.7]
 BETA_SEAT = [0.5, 1.0, 2.0, 3.0, 4.0]
 
